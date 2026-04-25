@@ -1,0 +1,5 @@
+{
+  "name": "Zyng",
+  "description": "A campus-exclusive, semi-anonymous social platform that captures real student emotions, conversations, and trends.",
+  "requestFramePermissions": ["camera", "geolocation"]
+}
