@@ -1,4 +1,4 @@
-import type {Metadata} from 'next';
+import type { Metadata } from 'next';
 import './globals.css'; // Global styles
 
 export const metadata: Metadata = {
@@ -9,6 +9,14 @@ export const metadata: Metadata = {
     capable: true,
     statusBarStyle: 'default',
     title: 'Zyng',
+  },
+  icons: {
+    icon: [
+      { url: "/favicon.ico" },
+    ],
+    apple: [
+      { url: "/apple-touch-icon.png" },
+    ],
   },
 };
 
@@ -23,7 +31,7 @@ const inter = Inter({ subsets: ['latin'], variable: '--font-sans' });
 import { Providers } from '@/components/providers';
 import { MaintenanceBanner } from '@/components/maintenance-banner';
 
-export default function RootLayout({children}: {children: React.ReactNode}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning className={`${inter.variable} font-sans`}>
       <body suppressHydrationWarning className="antialiased">
