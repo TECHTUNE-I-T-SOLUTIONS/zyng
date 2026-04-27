@@ -12,7 +12,11 @@
   <a href="docs/routes.md">Routes</a> ·
   <a href="docs/route-guide.md">Route Guide</a> ·
   <a href="public/documentations.md">Developer Docs</a> ·
-  <a href="lib/db/schema.sql">Schema</a>
+  <a href="lib/db/schema.sql">Schema</a> ·
+  <a href="public/vibecoding.md">Vibe Coders</a>
+</p>
+
+<p align="center
 </p>
 
 ## Overview
@@ -58,6 +62,7 @@ That styling direction is intentional. It keeps the product feeling serious, mod
 ## How The Codebase Is Organized
 
 - [`public/documentations.md`](public/documentations.md) - long-form developer guide
+- [`public/vibecoding.md`](public/vibecoding.md) - how to work on Zyng quickly and safely
 - [`docs/routes.md`](docs/routes.md) - route URL list
 - [`docs/route-guide.md`](docs/route-guide.md) - route purpose guide
 - [`public/schools/`](public/schools/) - school and department seed data
