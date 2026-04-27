@@ -28,3 +28,40 @@ export async function registerWithPhone(phoneNumber: string, password: string, c
   });
   return { data, error };
 }
+
+export async function registerAdmin(email: string, password: string, level: string, userId?: string) {
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password,
+    options: {
+      data: {
+        role: 'admin',
+        admin_level: level,
+        user_id: userId || null,
+      }
+    }
+  });
+  return { data, error };
+}
+
+export async function resetPasswordWithSecurityQuestion(phoneNumber: string, answer: string, newPassword: string) {
+  const { data: users, error: lookupError } = await supabase
+    .from('users')
+    .select('id, phone, security_question, security_answer_hash')
+    .eq('phone', phoneNumber)
+    .single();
+
+  if (lookupError) throw lookupError;
+
+  const { data: session, error: sessionError } = await supabase.auth.signInWithOtp({
+    email: `${phoneNumber}@zyng.campus`,
+  });
+
+  if (sessionError) throw sessionError;
+
+  // The actual answer verification and password reset should be enforced server-side.
+  const { error: updateError } = await supabase.auth.updateUser({ password: newPassword });
+  if (updateError) throw updateError;
+
+  return { data: { user: users, session }, error: null };
+}

@@ -1,9 +1,13 @@
 import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/db/supabase';
+import { supabaseAdmin } from '@/lib/db/supabase-admin';
+import { requireAdmin } from '@/lib/services/adminAuth';
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const { data, error } = await supabase
+    const guard = await requireAdmin(request as any);
+    if ('error' in guard) return NextResponse.json({ error: guard.error }, { status: guard.status });
+
+    const { data, error } = await supabaseAdmin
       .from('reports')
       .select('*, reporter:users(z_name)')
       .order('created_at', { ascending: false });
@@ -17,13 +21,16 @@ export async function GET() {
 
 export async function PATCH(request: Request) {
   try {
+    const guard = await requireAdmin(request as any);
+    if ('error' in guard) return NextResponse.json({ error: guard.error }, { status: guard.status });
+
     const { reportId, status, reviewedBy } = await request.json();
     
     // In a real app, verify admin session here
     
-    const { data, error } = await supabase
+    const { data, error } = await supabaseAdmin
       .from('reports')
-      .update({ status, reviewed_by: reviewedBy })
+      .update({ status })
       .eq('id', reportId)
       .select()
       .single();

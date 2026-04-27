@@ -168,6 +168,18 @@ CREATE TABLE IF NOT EXISTS opportunities (
     created_at TIMESTAMPTZ DEFAULT now()
 );
 
+CREATE TABLE IF NOT EXISTS opportunity_applications (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    opportunity_id UUID REFERENCES opportunities(id) ON DELETE CASCADE,
+    applicant_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    resume_id UUID REFERENCES resumes(id) ON DELETE SET NULL,
+    cover_letter TEXT,
+    status TEXT DEFAULT 'submitted',
+    created_at TIMESTAMPTZ DEFAULT now(),
+    updated_at TIMESTAMPTZ DEFAULT now(),
+    UNIQUE(opportunity_id, applicant_id)
+);
+
 -- 6. NOTIFICATIONS & ADMINS
 CREATE TABLE IF NOT EXISTS notifications (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -177,6 +189,16 @@ CREATE TABLE IF NOT EXISTS notifications (
     message TEXT NOT NULL,
     link TEXT,
     is_read BOOLEAN DEFAULT false,
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS reports (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    reporter_id UUID REFERENCES users(id),
+    target_type TEXT NOT NULL,
+    target_id UUID NOT NULL,
+    reason TEXT NOT NULL,
+    status TEXT DEFAULT 'pending',
     created_at TIMESTAMPTZ DEFAULT now()
 );
 
@@ -225,16 +247,6 @@ CREATE TABLE IF NOT EXISTS admin_notifications (
     title TEXT NOT NULL,
     message TEXT NOT NULL,
     is_resolved BOOLEAN DEFAULT false,
-    created_at TIMESTAMPTZ DEFAULT now()
-);
-
-CREATE TABLE IF NOT EXISTS reports (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    reporter_id UUID REFERENCES users(id),
-    target_type TEXT NOT NULL,
-    target_id UUID NOT NULL,
-    reason TEXT NOT NULL,
-    status TEXT DEFAULT 'pending',
     created_at TIMESTAMPTZ DEFAULT now()
 );
 

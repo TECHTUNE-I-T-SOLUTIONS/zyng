@@ -2,35 +2,62 @@
 
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeft } from 'lucide-react';
+import { ChevronLeft, Loader2, ShieldQuestion, Lock, Phone, CheckCircle2 } from 'lucide-react';
 import Link from 'next/link';
 
 export default function RecoveryPage() {
   const [step, setStep] = useState(1);
   const [phone, setPhone] = useState('');
+  const [question, setQuestion] = useState('');
   const [answer, setAnswer] = useState('');
   const [newPassword, setNewPassword] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [done, setDone] = useState(false);
 
-  // In real app, we'd fetch the question for this phone number
-  const mockQuestion = "What was the name of your first pet?";
-
-  const handlePhoneSubmit = (e: React.FormEvent) => {
+  const loadQuestion = async (e: React.FormEvent) => {
     e.preventDefault();
-    setStep(2);
+    setLoading(true);
+    try {
+      const res = await fetch('/api/auth/recover', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ step: 'question', phone }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not fetch security question');
+      setQuestion(data?.security_question || '');
+      setStep(2);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleAnswerSubmit = (e: React.FormEvent) => {
+  const verifyAnswer = async (e: React.FormEvent) => {
     e.preventDefault();
-    setStep(3);
+    setLoading(true);
+    try {
+      // In production, verify the answer hash server-side before allowing reset.
+      setStep(3);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleResetSubmit = (e: React.FormEvent) => {
+  const submitReset = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
-    setTimeout(() => {
-      // success
-    }, 2000);
+    setLoading(true);
+    try {
+      const res = await fetch('/api/auth/recover', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ step: 'reset', phone, answer, newPassword }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Reset failed');
+      setDone(true);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -41,115 +68,66 @@ export default function RecoveryPage() {
       </Link>
 
       <div className="flex-1 flex flex-col justify-center max-w-sm w-full mx-auto mt-12 lg:mt-0">
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="space-y-6"
-        >
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">Restore Access</h1>
             <p className="text-sm text-foreground/60 mt-2">
-              {step === 1 ? 'Enter your phone number to find your account.' : step === 2 ? 'Answer your security question.' : 'Create a new passcode.'}
+              {done ? 'Your password has been updated.' : step === 1 ? 'Enter your phone number to find your account.' : step === 2 ? 'Answer your security question.' : 'Create a new passcode.'}
             </p>
           </div>
 
-          <AnimatePresence mode="wait">
-            {step === 1 && (
-              <motion.form
-                key="step1"
-                initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.2 }}
-                onSubmit={handlePhoneSubmit}
-                className="space-y-4"
-              >
-                <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-foreground/80">Phone Number</label>
-                  <input
-                    type="tel"
-                    required
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    className="w-full bg-background border border-border rounded-md px-4 py-2.5 text-sm focus:outline-none focus:border-accent/50 transition-colors"
-                    placeholder="+1 (555) 000-0000"
-                  />
-                </div>
-                <div className="pt-2">
-                  <button
-                    type="submit"
-                    className="w-full bg-accent hover:bg-accent/90 text-black font-medium py-2.5 rounded-md flex items-center justify-center gap-2 transition-colors text-sm"
-                  >
-                    Continue
-                  </button>
-                </div>
-              </motion.form>
-            )}
+          {done ? (
+            <div className="p-4 rounded-lg border border-green-500/20 bg-green-500/5 text-sm flex items-center gap-2">
+              <CheckCircle2 className="text-green-500" size={18} />
+              Recovery complete. You can sign in now.
+            </div>
+          ) : (
+            <AnimatePresence mode="wait">
+              {step === 1 && (
+                <motion.form key="step1" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} onSubmit={loadQuestion} className="space-y-4">
+                  <Field icon={Phone} label="Phone Number">
+                    <input type="tel" required value={phone} onChange={(e) => setPhone(e.target.value)} className="input" placeholder="+1 (555) 000-0000" />
+                  </Field>
+                  <button type="submit" className="btn w-full" disabled={loading}>{loading ? <Loader2 className="animate-spin" /> : 'Continue'}</button>
+                </motion.form>
+              )}
 
-            {step === 2 && (
-              <motion.form
-                key="step2"
-                initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.2 }}
-                onSubmit={handleAnswerSubmit}
-                className="space-y-4"
-              >
-                <div className="p-4 bg-muted/50 rounded-lg border border-border mb-2">
-                  <div className="text-xs font-medium text-foreground/60 mb-1">Security Question</div>
-                  <div className="text-sm font-medium">{mockQuestion}</div>
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-foreground/80">Secret Answer</label>
-                  <input
-                    type="text"
-                    required
-                    value={answer}
-                    onChange={(e) => setAnswer(e.target.value)}
-                    className="w-full bg-background border border-border rounded-md px-4 py-2.5 text-sm focus:outline-none focus:border-accent/50 transition-colors"
-                    placeholder="Your answer"
-                  />
-                </div>
-                <div className="pt-2">
-                  <button
-                    type="submit"
-                    className="w-full bg-accent hover:bg-accent/90 text-black font-medium py-2.5 rounded-md flex items-center justify-center gap-2 transition-colors text-sm"
-                  >
-                    Verify Identity
-                  </button>
-                </div>
-              </motion.form>
-            )}
+              {step === 2 && (
+                <motion.form key="step2" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} onSubmit={verifyAnswer} className="space-y-4">
+                  <div className="p-4 bg-muted/50 rounded-lg border border-border mb-2">
+                    <div className="text-xs font-medium text-foreground/60 mb-1">Security Question</div>
+                    <div className="text-sm font-medium flex items-center gap-2"><ShieldQuestion size={16} /> {question || 'Security question not found.'}</div>
+                  </div>
+                  <Field icon={Lock} label="Secret Answer">
+                    <input type="text" required value={answer} onChange={(e) => setAnswer(e.target.value)} className="input" placeholder="Your answer" />
+                  </Field>
+                  <button type="submit" className="btn w-full" disabled={loading}>{loading ? <Loader2 className="animate-spin" /> : 'Verify Identity'}</button>
+                </motion.form>
+              )}
 
-            {step === 3 && (
-              <motion.form
-                key="step3"
-                initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.2 }}
-                onSubmit={handleResetSubmit}
-                className="space-y-4"
-              >
-                <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-foreground/80">New Passcode</label>
-                  <input
-                    type="password"
-                    required
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    className="w-full bg-background border border-border rounded-md px-4 py-2.5 text-sm focus:outline-none focus:border-accent/50 transition-colors"
-                    placeholder="••••••••"
-                  />
-                </div>
-                <div className="pt-2">
-                  <button
-                    type="submit" disabled={isLoading}
-                    className="w-full bg-accent hover:bg-accent/90 text-black font-medium py-2.5 rounded-md flex items-center justify-center gap-2 transition-colors disabled:opacity-50 text-sm"
-                  >
-                    {isLoading ? 'Resetting...' : 'Update Passcode'}
-                  </button>
-                </div>
-              </motion.form>
-            )}
-          </AnimatePresence>
+              {step === 3 && (
+                <motion.form key="step3" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} onSubmit={submitReset} className="space-y-4">
+                  <Field icon={Lock} label="New Passcode">
+                    <input type="password" required value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="input" placeholder="••••••••" />
+                  </Field>
+                  <button type="submit" className="btn w-full" disabled={loading}>{loading ? <Loader2 className="animate-spin" /> : 'Update Passcode'}</button>
+                </motion.form>
+              )}
+            </AnimatePresence>
+          )}
         </motion.div>
       </div>
+    </div>
+  );
+}
 
-      <div className="mt-8 text-xs text-foreground/40 text-center max-w-sm mx-auto">
-        If you've lost your phone number, please contact <br /> <Link href="/contact" className="underline hover:text-foreground">support</Link>.
+function Field({ icon: Icon, label, children }: any) {
+  return (
+    <div className="space-y-1.5">
+      <label className="text-xs font-medium text-foreground/80">{label}</label>
+      <div className="relative">
+        <Icon size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-foreground/30 pointer-events-none" />
+        {children}
       </div>
     </div>
   );

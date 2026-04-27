@@ -1,14 +1,14 @@
 import { supabase } from '@/lib/db/supabase';
 
 export const postService = {
-  async getPosts(campus?: string) {
+  async getPosts(schoolId?: string) {
     let query = supabase
       .from('posts')
-      .select('*, persona:personas(*)')
+      .select('*, persona:personas(*), user:users(status, z_name, full_name), replies(*, persona:personas(*))')
       .order('created_at', { ascending: false });
 
-    if (campus) {
-      query = query.eq('school_slug', campus);
+    if (schoolId) {
+      query = query.eq('school_id', schoolId);
     }
 
     const { data, error } = await query;
@@ -19,7 +19,7 @@ export const postService = {
   async getPostById(id: string) {
     const { data, error } = await supabase
       .from('posts')
-      .select('*, persona:personas(*), replies(*, persona:personas(*))')
+      .select('*, persona:personas(*), user:users(status, z_name, full_name), replies(*, persona:personas(*))')
       .eq('id', id)
       .single();
 
@@ -30,7 +30,16 @@ export const postService = {
   async createPost(post: any) {
     const { data, error } = await supabase
       .from('posts')
-      .insert(post)
+      .insert({
+        user_id: post.user_id,
+        persona_id: post.persona_id,
+        school_id: post.school_id,
+        type: post.type,
+        content: post.content,
+        media_url: post.media_url,
+        poll_options: post.poll_options,
+        expires_at: post.expires_at,
+      })
       .select()
       .single();
 

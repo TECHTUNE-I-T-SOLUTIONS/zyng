@@ -2,6 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/db/supabase';
+import { maintenanceService } from '@/lib/services/maintenanceService';
 import { motion } from 'framer-motion';
 import { 
   Users, 
@@ -12,12 +13,21 @@ import {
   UserPlus,
   Lock,
   UserMinus,
-  Loader2
+  Loader2,
+  ToggleLeft,
+  ToggleRight,
+  AlertTriangle,
+  Save
 } from 'lucide-react';
+import { useState } from 'react';
+import { useEffect } from 'react';
 
 export default function AdminDashboard() {
-  const isAdmin = true; // Temporary
-  const isSuperAdmin = true; // Temporary
+  const [adminLevel, setAdminLevel] = useState<'super' | 'admin' | 'sub' | 'moderator' | null>(null);
+  const [savingMaintenance, setSavingMaintenance] = useState(false);
+  const [maintenanceEnabled, setMaintenanceEnabled] = useState(false);
+  const [maintenanceTitle, setMaintenanceTitle] = useState('Maintenance in Progress');
+  const [maintenanceMessage, setMaintenanceMessage] = useState('We are making improvements to Zyng. You may experience brief interruptions while updates are being applied.');
 
   const { data: stats, isLoading } = useQuery({
     queryKey: ['admin-stats'],
@@ -28,6 +38,69 @@ export default function AdminDashboard() {
       return { users, zyngs, reports };
     }
   });
+
+  useQuery({
+    queryKey: ['admin-maintenance'],
+    queryFn: async () => {
+      const current = await maintenanceService.getCurrent();
+      if (current) {
+        setMaintenanceEnabled(!!current.is_enabled);
+        setMaintenanceTitle(current.title || maintenanceTitle);
+        setMaintenanceMessage(current.message || maintenanceMessage);
+      }
+      return current;
+    },
+  });
+
+  useQuery({
+    queryKey: ['admin-me'],
+    queryFn: async () => {
+      const { data: auth } = await supabase.auth.getUser();
+      if (!auth.user) {
+        setAdminLevel(null);
+        return null;
+      }
+
+      const { data } = await supabase
+        .from('admins')
+        .select('level')
+        .eq('user_id', auth.user.id)
+        .maybeSingle();
+
+      setAdminLevel((data?.level as typeof adminLevel) || null);
+      return data;
+    },
+  });
+
+  const handleMaintenanceSave = async () => {
+    setSavingMaintenance(true);
+    try {
+      await maintenanceService.updateMaintenance({
+        is_enabled: maintenanceEnabled,
+        title: maintenanceTitle,
+        message: maintenanceMessage,
+      });
+    } finally {
+      setSavingMaintenance(false);
+    }
+  };
+
+  const canAccessAdminTools = !!adminLevel;
+  const canAccessSuperTools = adminLevel === 'super';
+
+  if (!canAccessAdminTools) {
+    return (
+      <div className="space-y-6">
+        <header>
+          <h1 className="text-4xl font-black tracking-tighter mb-2">OPERATIONS OVERVIEW</h1>
+          <p className="text-white/40 font-bold uppercase tracking-widest text-xs">Restricted Area</p>
+        </header>
+        <div className="bg-neutral-900 border border-white/5 rounded-[2rem] p-8 text-white/60">
+          You do not have verified admin access to view this panel.
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-10">
@@ -84,7 +157,7 @@ export default function AdminDashboard() {
         </section>
 
         {/* Security Controls (Super Admin Only) */}
-        {isSuperAdmin && (
+        {canAccessSuperTools && (
           <section className="bg-neutral-900 border border-white/5 rounded-[2.5rem] p-8 border-l-4 border-l-accent">
             <div className="flex items-center justify-between mb-8">
               <h2 className="text-xl font-black tracking-tight flex items-center gap-2">
@@ -114,6 +187,50 @@ export default function AdminDashboard() {
           </section>
         )}
       </div>
+
+      {canAccessSuperTools && (
+        <section className="bg-neutral-900 border border-white/5 rounded-[2.5rem] p-8">
+          <div className="flex items-center justify-between gap-4 mb-6">
+            <div>
+              <h2 className="text-xl font-black tracking-tight flex items-center gap-2">
+                <AlertTriangle className="text-amber-400" size={20} />
+                MAINTENANCE MODE
+              </h2>
+              <p className="text-white/40 text-xs uppercase tracking-widest font-bold mt-1">Banner text and toggle are read from the maintenance table</p>
+            </div>
+            <button
+              onClick={() => setMaintenanceEnabled((s) => !s)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-2xl border text-xs font-black uppercase tracking-widest transition-all ${maintenanceEnabled ? 'bg-amber-500/15 border-amber-400/30 text-amber-200' : 'bg-white/5 border-white/10 text-white/40'}`}
+            >
+              {maintenanceEnabled ? <ToggleRight size={18} /> : <ToggleLeft size={18} />}
+              {maintenanceEnabled ? 'Enabled' : 'Disabled'}
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4">
+            <input
+              value={maintenanceTitle}
+              onChange={(e) => setMaintenanceTitle(e.target.value)}
+              className="w-full bg-black/30 border border-white/10 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:border-amber-400/40"
+              placeholder="Banner title"
+            />
+            <textarea
+              value={maintenanceMessage}
+              onChange={(e) => setMaintenanceMessage(e.target.value)}
+              className="w-full min-h-28 bg-black/30 border border-white/10 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:border-amber-400/40 resize-y"
+              placeholder="Banner message"
+            />
+            <button
+              onClick={handleMaintenanceSave}
+              disabled={savingMaintenance}
+              className="inline-flex items-center justify-center gap-2 bg-amber-500 text-black px-5 py-3 rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-amber-400 transition-all disabled:opacity-50"
+            >
+              <Save size={14} />
+              {savingMaintenance ? 'Saving...' : 'Save Maintenance'}
+            </button>
+          </div>
+        </section>
+      )}
     </div>
   );
 }
