@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useQuery } from '@tanstack/react-query';
 import { 
   Rss, 
   PlusSquare, 
@@ -18,10 +19,12 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '@/lib/utils';
+import { userService } from '@/lib/services/userService';
 
 export default function ZLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const { data: user } = useQuery({ queryKey: ['z-layout-me'], queryFn: () => userService.getCurrentUser() });
   
   const navItems = [
     { name: 'Zynging', href: '/z-feed', icon: Rss },
@@ -68,12 +71,12 @@ export default function ZLayout({ children }: { children: React.ReactNode }) {
             <div className="bg-gradient-to-tr from-accent/20 to-transparent p-4 rounded-2xl border border-accent/10 group-hover:border-accent/30 transition-all">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-full bg-accent flex items-center justify-center font-bold text-black">
-                  G
+                  {user?.z_name?.[0]?.toUpperCase() || user?.full_name?.[0]?.toUpperCase() || 'Z'}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="text-sm font-bold truncate">GhostBoi_24</div>
+                  <div className="text-sm font-bold truncate">{user?.z_name || user?.full_name || 'Your Persona'}</div>
                   <div className="text-[10px] text-accent uppercase font-bold tracking-tight">
-                    Trust: 4,820
+                    Trust: {user?.trust_score ?? 0}
                   </div>
                 </div>
               </div>

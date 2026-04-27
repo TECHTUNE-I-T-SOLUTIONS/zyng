@@ -52,7 +52,9 @@ export default function AlumniProfilePage() {
                     <h2 className="text-3xl font-black tracking-tight text-white">{user?.full_name || 'Alumni Zynger'}</h2>
                     <span className="bg-indigo-500/10 text-indigo-400 text-[10px] font-black px-3 py-1 rounded-full uppercase border border-indigo-500/20">Verified Alumni</span>
                   </div>
-                  <p className="text-indigo-400 font-bold uppercase tracking-widest text-[10px] mt-2 italic">Class of 2023 • Unilorin</p>
+                  <p className="text-indigo-400 font-bold uppercase tracking-widest text-[10px] mt-2 italic">
+                    {user?.school?.name || 'Alumni Network'} • {user?.status === 'alumni' ? 'Verified Alumni' : 'Profile Pending'}
+                  </p>
                 </div>
               </div>
 

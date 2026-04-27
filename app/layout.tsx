@@ -4,6 +4,16 @@ import './globals.css'; // Global styles
 export const metadata: Metadata = {
   title: 'Zyng',
   description: 'A campus-exclusive, semi-anonymous social platform.',
+  manifest: '/manifest.json',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'Zyng',
+  },
+};
+
+export const viewport = {
+  themeColor: '#ffb800',
 };
 
 import { Inter } from 'next/font/google';

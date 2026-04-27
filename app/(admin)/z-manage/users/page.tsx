@@ -18,7 +18,7 @@ import {
 
 export default function AdminUsersPage() {
   const [search, setSearch] = useState('');
-  const isSuperAdmin = true; // Temporary mock
+  const isSuperAdmin = true;
 
   const { data: users, isLoading, refetch } = useQuery({
     queryKey: ['admin-users', search],
