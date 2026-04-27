@@ -3,22 +3,59 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { ArrowRight, ChevronLeft } from 'lucide-react';
+import { ArrowRight, ChevronLeft, Loader2 } from 'lucide-react';
 import Link from 'next/link';
+import { supabase } from '@/lib/db/supabase';
 
 export default function LoginPage() {
   const [phoneNumber, setPhoneNumber] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [touched, setTouched] = useState({ phone: false, password: false });
   const router = useRouter();
+
+  const isPhoneValid = /^\+?[0-9 ()-]{7,}$/.test(phoneNumber.trim());
+  const isPasswordValid = password.length >= 8;
+  const passwordStrength = getPasswordStrength(password);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setTouched({ phone: true, password: true });
+
+    if (!isPhoneValid) {
+      setError('Enter a valid phone number.');
+      return;
+    }
+    if (!isPasswordValid) {
+      setError('Passcode must be at least 8 characters long.');
+      return;
+    }
+
     setIsLoading(true);
-    // Logic for loginWithPhone will go here
-    setTimeout(() => {
-      router.push('/z-feed');
-    }, 1000);
+    setError('');
+    try {
+      const { data: userRecord, error: lookupError } = await supabase
+        .from('users')
+        .select('email, status')
+        .eq('phone', phoneNumber.trim())
+        .single();
+
+      if (lookupError) throw lookupError;
+      if (!userRecord?.email) throw new Error('No account email found for that phone number.');
+
+      const { error: authError } = await supabase.auth.signInWithPassword({
+        email: userRecord.email,
+        password,
+      });
+      if (authError) throw authError;
+
+      router.push(userRecord.status === 'alumni' ? '/z-alumni/dashboard' : '/z-feed');
+    } catch (err: any) {
+      setError(err.message || 'Sign in failed');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -42,16 +79,24 @@ export default function LoginPage() {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
+            {error && (
+              <div className="rounded-xl border border-red-500/20 bg-red-500/5 px-4 py-3 text-sm text-red-600">
+                {error}
+              </div>
+            )}
+
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-foreground/80">Phone Number</label>
               <input
                 type="tel"
                 required
                 value={phoneNumber}
-                onChange={(e) => setPhoneNumber(e.target.value)}
+                onChange={(e) => { setPhoneNumber(e.target.value); setError(''); }}
+                onBlur={() => setTouched((s) => ({ ...s, phone: true }))}
                 className="w-full bg-background border border-border rounded-md px-4 py-2.5 text-sm focus:outline-none focus:border-accent/50 transition-colors"
                 placeholder="+1 (555) 000-0000"
               />
+              {touched.phone && !isPhoneValid && <p className="text-[11px] text-red-500">Enter a valid phone number.</p>}
             </div>
 
             <div className="space-y-1.5">
@@ -65,19 +110,22 @@ export default function LoginPage() {
                 type="password"
                 required
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(e) => { setPassword(e.target.value); setError(''); }}
+                onBlur={() => setTouched((s) => ({ ...s, password: true }))}
                 className="w-full bg-background border border-border rounded-md px-4 py-2.5 text-sm focus:outline-none focus:border-accent/50 transition-colors"
                 placeholder="••••••••"
               />
+              <PasswordStrengthBar strength={passwordStrength} />
+              {touched.password && !isPasswordValid && <p className="text-[11px] text-red-500">Passcode must be at least 8 characters long.</p>}
             </div>
 
             <div className="pt-2">
               <button
                 type="submit"
-                disabled={isLoading}
+                disabled={isLoading || !isPhoneValid || !isPasswordValid}
                 className="w-full bg-accent hover:bg-accent/90 text-black font-medium py-2.5 rounded-md flex items-center justify-center gap-2 transition-colors disabled:opacity-50 text-sm"
               >
-                {isLoading ? 'Connecting...' : 'Sign in'}
+                {isLoading ? <Loader2 className="animate-spin" size={16} /> : 'Sign in'}
               </button>
             </div>
           </form>
@@ -91,6 +139,30 @@ export default function LoginPage() {
       <div className="mt-8 text-xs text-foreground/40 text-center max-w-sm mx-auto">
         By continuing, you agree to Zyng's <Link href="/terms" className="underline hover:text-foreground">Terms of Service</Link> and <Link href="/privacy" className="underline hover:text-foreground">Privacy Policy</Link>.
       </div>
+    </div>
+  );
+}
+
+function getPasswordStrength(password: string) {
+  let score = 0;
+  if (password.length >= 8) score += 1;
+  if (password.length >= 12) score += 1;
+  if (/[A-Z]/.test(password)) score += 1;
+  if (/[0-9]/.test(password)) score += 1;
+  if (/[^A-Za-z0-9]/.test(password)) score += 1;
+  return score;
+}
+
+function PasswordStrengthBar({ strength }: { strength: number }) {
+  const label = strength <= 1 ? 'Weak' : strength <= 3 ? 'Fair' : 'Strong';
+  const color = strength <= 1 ? 'bg-red-500' : strength <= 3 ? 'bg-amber-500' : 'bg-green-500';
+
+  return (
+    <div className="space-y-1">
+      <div className="h-1.5 w-full rounded-full bg-border overflow-hidden">
+        <div className={`h-full ${color}`} style={{ width: `${Math.min(100, strength * 20)}%` }} />
+      </div>
+      <div className="text-[11px] text-foreground/40">{label} password</div>
     </div>
   );
 }

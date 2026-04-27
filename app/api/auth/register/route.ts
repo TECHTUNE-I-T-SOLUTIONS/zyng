@@ -7,6 +7,7 @@ export async function POST(request: Request) {
     const {
       phone,
       email,
+      status,
       password,
       full_name,
       z_name,
@@ -24,7 +25,7 @@ export async function POST(request: Request) {
       security_answer,
     } = body;
 
-    if (!phone || !password || !full_name || !z_name || !school_id || !course_of_study || !security_question || !security_answer) {
+    if (!phone || !password || !full_name || !z_name || !school_id || !course_of_study || !graduation_date || !security_question || !security_answer) {
       return NextResponse.json({ error: 'Missing required signup fields' }, { status: 400 });
     }
     if (String(password).length < 8) {
@@ -34,8 +35,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Invalid email address' }, { status: 400 });
     }
 
+    const finalStatus = status === 'alumni' ? 'alumni' : 'regular';
+
     const { data: authResult, error: authError } = await supabaseAdmin.auth.signUp({
-      email: `${phone}@zyng.campus`,
+      email: String(email).trim(),
       password,
       options: {
         data: { phone_number: phone, email, role: 'user' },
@@ -58,10 +61,11 @@ export async function POST(request: Request) {
       bio,
       graduation_date: graduation_date || null,
       referral_code: referral_code || null,
+      referred_by: referred_by || null,
       security_question,
       security_answer_hash: security_answer,
       onboarding_completed: false,
-      status: 'regular',
+      status: finalStatus,
     }]).select().single();
 
     if (error) throw error;
