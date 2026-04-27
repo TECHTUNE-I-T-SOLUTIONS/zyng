@@ -333,8 +333,8 @@ export default function LandingPage() {
       <section className="py-32 px-6 text-center space-y-8 bg-muted/10 border-t border-border relative overflow-hidden">
         <div className="absolute inset-0 bg-accent/5 blur-[100px] z-0" />
         <div className="relative z-10">
-          <h2 className="text-4xl md:text-5xl font-medium tracking-tight mb-4">Your campus is already talking.</h2>
-          <p className="opacity-60 mb-8 max-w-md mx-auto">Join thousands of students sharing, venting, and connecting right now on Zyng.</p>
+          <h2 className="text-4xl md:text-5xl font-medium tracking-tight mb-4">Join other Zyngers today on Zyng.</h2>
+          <p className="opacity-60 mb-8 max-w-md mx-auto">Join thousands of users sharing, creating, and connecting right now on Zyng.</p>
           <Link href="/in/signup" className="inline-flex px-8 py-3 bg-accent hover:bg-accent/90 text-[hsl(var(--background))] font-medium rounded-md transition-all hover:scale-105 active:scale-95 shadow-lg shadow-accent/20">
             Get Started Now
           </Link>

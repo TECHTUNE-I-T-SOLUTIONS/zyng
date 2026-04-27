@@ -1,0 +1,23 @@
+[
+  {
+    "id": "unilorin",
+    "name": "University of Ilorin",
+    "slug": "unilorin",
+    "is_active": true,
+    "logo_url": "/schools/unilorin-logo.png"
+  },
+  {
+    "id": "unilag",
+    "name": "University of Lagos",
+    "slug": "unilag",
+    "is_active": false,
+    "logo_url": "/schools/unilag-logo.png"
+  },
+  {
+    "id": "ui",
+    "name": "University of Ibadan",
+    "slug": "ui",
+    "is_active": false,
+    "logo_url": "/schools/ui-logo.png"
+  }
+]

@@ -10,19 +10,25 @@ import {
   MessageSquare, 
   Flame, 
   TrendingUp,
-  Zap
+  Zap,
+  Briefcase,
+  Search,
+  Bell,
+  LogOut
 } from 'lucide-react';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '@/lib/utils';
 
 export default function ZLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
   
   const navItems = [
-    { name: 'Feed', href: '/z/feed', icon: Rss },
-    { name: 'Rooms', href: '/z/rooms', icon: MessageSquare },
-    { name: 'Hot Takes', href: '/z/hot-takes', icon: Flame },
-    { name: 'Confessions', href: '/z/confessions', icon: Zap },
+    { name: 'Zynging', href: '/z-feed', icon: Rss },
+    { name: 'Pro Hub', href: '/z-pro', icon: Briefcase },
+    { name: 'Rooms', href: '/z-rooms', icon: MessageSquare },
+    { name: 'Events', href: '/z-events', icon: TrendingUp },
+    { name: 'Marketplace', href: '/z-marketplace', icon: Zap },
   ];
 
   return (
@@ -30,7 +36,7 @@ export default function ZLayout({ children }: { children: React.ReactNode }) {
       {/* Left Sidebar */}
       <aside className="w-64 border-r border-border flex flex-col p-6 shrink-0">
         <div className="mb-10">
-          <Link href="/z/feed">
+          <Link href="/z-feed">
             <h1 className="text-accent text-3xl font-black tracking-tighter">ZYNG</h1>
           </Link>
           <div className="text-[10px] uppercase tracking-widest text-accent/60 font-bold mt-1">
@@ -56,9 +62,9 @@ export default function ZLayout({ children }: { children: React.ReactNode }) {
           ))}
         </nav>
 
-        {/* Persona Switcher Stub */}
+        {/* Zync (Persona) Switcher */}
         <div className="mt-auto pt-6 border-t border-border">
-          <Link href="/z/personas" className="group">
+          <Link href="/z-personas" className="group">
             <div className="bg-gradient-to-tr from-accent/20 to-transparent p-4 rounded-2xl border border-accent/10 group-hover:border-accent/30 transition-all">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-full bg-accent flex items-center justify-center font-bold text-black">
