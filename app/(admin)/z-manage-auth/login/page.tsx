@@ -7,9 +7,20 @@ import Link from 'next/link';
 
 export default function AdminLogin() {
   const [loading, setLoading] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+
+  const isEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+  const isPasswordValid = password.length >= 8;
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isEmailValid || !isPasswordValid) {
+      setError('Enter a valid admin email and a password that is at least 8 characters long.');
+      return;
+    }
+    setError('');
     setLoading(true);
     // Logic will go here
   };
@@ -30,6 +41,7 @@ export default function AdminLogin() {
         </div>
 
         <form onSubmit={handleLogin} className="space-y-4">
+          {error && <div className="rounded-xl border border-red-500/20 bg-red-500/5 px-4 py-3 text-sm text-red-400">{error}</div>}
           <div className="relative group">
             <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-white/20 group-focus-within:text-accent transition-colors" size={20} />
             <input 
@@ -37,6 +49,8 @@ export default function AdminLogin() {
               placeholder="Admin Email" 
               className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 pl-12 pr-6 text-white focus:outline-none focus:border-accent focus:bg-white/10 transition-all font-medium"
               required
+              value={email}
+              onChange={(e) => { setEmail(e.target.value); setError(''); }}
             />
           </div>
 
@@ -47,12 +61,14 @@ export default function AdminLogin() {
               placeholder="Password" 
               className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 pl-12 pr-6 text-white focus:outline-none focus:border-accent focus:bg-white/10 transition-all font-medium"
               required
+              value={password}
+              onChange={(e) => { setPassword(e.target.value); setError(''); }}
             />
           </div>
 
           <button 
             type="submit" 
-            disabled={loading}
+            disabled={loading || !isEmailValid || !isPasswordValid}
             className="w-full bg-accent text-black py-4 rounded-2xl font-black uppercase tracking-widest text-sm hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2 shadow-lg shadow-accent/20 disabled:opacity-50"
           >
             {loading ? <Loader2 className="animate-spin" /> : <>ENTER DASHBOARD <ArrowRight size={18} /></>}

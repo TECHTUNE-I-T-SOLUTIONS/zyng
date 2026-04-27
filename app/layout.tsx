@@ -29,9 +29,7 @@ export default function RootLayout({children}: {children: React.ReactNode}) {
       <body suppressHydrationWarning className="antialiased">
         <Providers>
           <MaintenanceBanner />
-          <div className="pt-10 sm:pt-12">
-            {children}
-          </div>
+          {children}
         </Providers>
       </body>
     </html>

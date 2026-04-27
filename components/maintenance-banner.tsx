@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { AlertTriangle } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
@@ -10,6 +11,14 @@ export function MaintenanceBanner() {
     queryKey: ['maintenance'],
     queryFn: () => maintenanceService.getCurrent(),
   });
+
+  useEffect(() => {
+    const height = data?.is_enabled ? '48px' : '';
+    document.body.style.paddingTop = height;
+    return () => {
+      document.body.style.paddingTop = '';
+    };
+  }, [data?.is_enabled]);
 
   if (!data?.is_enabled) return null;
 

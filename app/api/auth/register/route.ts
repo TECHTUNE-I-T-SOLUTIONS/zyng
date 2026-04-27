@@ -24,6 +24,16 @@ export async function POST(request: Request) {
       security_answer,
     } = body;
 
+    if (!phone || !password || !full_name || !z_name || !school_id || !course_of_study || !security_question || !security_answer) {
+      return NextResponse.json({ error: 'Missing required signup fields' }, { status: 400 });
+    }
+    if (String(password).length < 8) {
+      return NextResponse.json({ error: 'Password must be at least 8 characters long' }, { status: 400 });
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email || '').trim())) {
+      return NextResponse.json({ error: 'Invalid email address' }, { status: 400 });
+    }
+
     const { data: authResult, error: authError } = await supabaseAdmin.auth.signUp({
       email: `${phone}@zyng.campus`,
       password,

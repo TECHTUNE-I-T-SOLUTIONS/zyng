@@ -7,6 +7,7 @@ import Link from 'next/link';
 
 export default function AdminSignup() {
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
   const [form, setForm] = useState({
     email: '',
     password: '',
@@ -16,9 +17,21 @@ export default function AdminSignup() {
     adminLevel: 'moderator',
   });
 
+  const isEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim());
+  const isPasswordValid = form.password.length >= 8;
+  const isSecretValid = form.secretCode.trim().length >= 6;
+  const isNameValid = form.full_name.trim().length >= 2;
+  const isZNameValid = form.z_name.trim().length >= 2;
+  const isLevelValid = ['super', 'admin', 'sub', 'moderator'].includes(form.adminLevel);
+
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isEmailValid || !isPasswordValid || !isSecretValid || !isNameValid || !isZNameValid || !isLevelValid) {
+      setError('Please complete every field with a valid admin email, a strong password, a valid secret code, and a valid role.');
+      return;
+    }
     setLoading(true);
+    setError('');
     try {
       const res = await fetch('/api/admin/signup', {
         method: 'POST',
@@ -50,13 +63,14 @@ export default function AdminSignup() {
         </div>
 
         <form onSubmit={handleSignup} className="space-y-4">
-          <Input icon={Mail} value={form.email} onChange={(v: string) => setForm({ ...form, email: v })} placeholder="Work Email" />
-          <Input icon={User} value={form.full_name} onChange={(v: string) => setForm({ ...form, full_name: v })} placeholder="Full Name" />
-          <Input icon={User} value={form.z_name} onChange={(v: string) => setForm({ ...form, z_name: v })} placeholder="Display / Z Name" />
-          <Input icon={Lock} type="password" value={form.password} onChange={(v: string) => setForm({ ...form, password: v })} placeholder="Create Password" />
-          <Input icon={BadgeCheck} value={form.adminLevel} onChange={(v: string) => setForm({ ...form, adminLevel: v })} placeholder="admin / sub / moderator / super" />
-          <Input icon={Key} value={form.secretCode} onChange={(v: string) => setForm({ ...form, secretCode: v })} placeholder="Super Secret Code" />
-          <button type="submit" disabled={loading} className="w-full bg-white text-black py-4 rounded-2xl font-black uppercase tracking-widest text-sm hover:bg-accent transition-all flex items-center justify-center gap-2 disabled:opacity-50">
+          {error && <div className="rounded-xl border border-red-500/20 bg-red-500/5 px-4 py-3 text-sm text-red-400">{error}</div>}
+          <Input icon={Mail} value={form.email} onChange={(v: string) => { setForm({ ...form, email: v }); setError(''); }} placeholder="Work Email" invalid={form.email.length > 0 && !isEmailValid} />
+          <Input icon={User} value={form.full_name} onChange={(v: string) => { setForm({ ...form, full_name: v }); setError(''); }} placeholder="Full Name" invalid={form.full_name.length > 0 && !isNameValid} />
+          <Input icon={User} value={form.z_name} onChange={(v: string) => { setForm({ ...form, z_name: v }); setError(''); }} placeholder="Display / Z Name" invalid={form.z_name.length > 0 && !isZNameValid} />
+          <Input icon={Lock} type="password" value={form.password} onChange={(v: string) => { setForm({ ...form, password: v }); setError(''); }} placeholder="Create Password" invalid={form.password.length > 0 && !isPasswordValid} />
+          <Input icon={BadgeCheck} value={form.adminLevel} onChange={(v: string) => { setForm({ ...form, adminLevel: v }); setError(''); }} placeholder="admin / sub / moderator / super" invalid={!isLevelValid} />
+          <Input icon={Key} value={form.secretCode} onChange={(v: string) => { setForm({ ...form, secretCode: v }); setError(''); }} placeholder="Super Secret Code" invalid={form.secretCode.length > 0 && !isSecretValid} />
+          <button type="submit" disabled={loading || !isEmailValid || !isPasswordValid || !isSecretValid || !isNameValid || !isZNameValid || !isLevelValid} className="w-full bg-white text-black py-4 rounded-2xl font-black uppercase tracking-widest text-sm hover:bg-accent transition-all flex items-center justify-center gap-2 disabled:opacity-50">
             {loading ? <Loader2 className="animate-spin" /> : 'INITIALIZE ACCOUNT'}
           </button>
         </form>
@@ -71,16 +85,16 @@ export default function AdminSignup() {
   );
 }
 
-function Input({ icon: Icon, value, onChange, placeholder, type = 'text' }: { icon: any; value: string; onChange: (value: string) => void; placeholder: string; type?: string }) {
+function Input({ icon: Icon, value, onChange, placeholder, type = 'text', invalid = false }: { icon: any; value: string; onChange: (value: string) => void; placeholder: string; type?: string; invalid?: boolean }) {
   return (
     <div className="relative group">
-      <Icon className="absolute left-4 top-1/2 -translate-y-1/2 text-white/20" size={20} />
+      <Icon className={`absolute left-4 top-1/2 -translate-y-1/2 ${invalid ? 'text-red-400' : 'text-white/20'}`} size={20} />
       <input
         type={type}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 pl-12 pr-6 text-white focus:outline-none focus:border-accent focus:bg-white/10 transition-all font-medium"
+        className={`w-full bg-white/5 border rounded-2xl py-4 pl-12 pr-6 text-white focus:outline-none focus:bg-white/10 transition-all font-medium ${invalid ? 'border-red-500/40 focus:border-red-400' : 'border-white/10 focus:border-accent'}`}
       />
     </div>
   );
