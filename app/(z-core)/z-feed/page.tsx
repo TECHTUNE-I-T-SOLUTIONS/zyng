@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { usePosts } from '@/hooks/usePosts';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MessageSquare, ThumbsUp, Loader2, Plus, XCircle } from 'lucide-react';
+import { MessageSquare, ThumbsUp, Loader2, Plus, XCircle, Flame, Clock, Activity } from 'lucide-react';
 import { Post } from '@/types';
 
 export default function ZFeed() {
@@ -13,23 +13,31 @@ export default function ZFeed() {
   return (
     <div className="flex-1 flex flex-col min-h-0">
       {/* Top Header */}
-      <header className="h-16 border-b border-border flex items-center justify-between px-8 bg-background/80 backdrop-blur-md sticky top-0 z-10 shrink-0">
-        <div className="flex gap-8 h-full items-end">
-          {['trending', 'latest', 'pulse'].map((f) => (
-            <button 
-              key={f}
-              onClick={() => setFilter(f as any)}
-              className={`text-xs font-black uppercase tracking-widest pb-5 border-b-2 transition-all ${
-                filter === f ? 'border-accent text-accent' : 'border-transparent text-foreground/40 hover:text-foreground'
+      <header className="h-16 border-b border-border flex items-center justify-between px-2 md:px-8 bg-background/80 backdrop-blur-md sticky top-0 z-10 shrink-0">
+        {/* Tabs: icons or small text on mobile, full text on desktop */}
+        <div className="flex gap-4 md:gap-8 h-full items-end">
+          {[
+            { key: 'trending', label: 'Zynging Now', icon: <Flame size={18} /> },
+            { key: 'latest', label: 'Latest', icon: <Clock size={18} /> },
+            { key: 'pulse', label: 'Pulse', icon: <Activity size={18} /> },
+          ].map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => setFilter(tab.key as any)}
+              className={`flex flex-col items-center md:block text-[11px] md:text-xs font-black uppercase tracking-widest pb-2 md:pb-5 border-b-2 transition-all ${
+                filter === tab.key ? 'border-accent text-accent' : 'border-transparent text-foreground/40 hover:text-foreground'
               }`}
             >
-              {f === 'trending' ? 'Zynging Now' : f}
+              <span className="md:hidden">{tab.icon}</span>
+              <span className="hidden md:inline">{tab.label}</span>
+              <span className="md:hidden mt-0.5">{tab.label.split(' ')[0]}</span>
             </button>
           ))}
         </div>
-        <Link 
+        {/* Hide '+ Drop a Zyng' button on mobile, show on desktop */}
+        <Link
           href="/z-create"
-          className="bg-accent text-black px-6 py-2 rounded-full font-black text-xs uppercase tracking-tight shadow-lg shadow-accent/20 hover:shadow-xl hover:shadow-accent/40 transition-all flex items-center gap-2"
+          className="hidden md:flex bg-accent text-black px-6 py-2 rounded-full font-black text-xs uppercase tracking-tight shadow-lg shadow-accent/20 hover:shadow-xl hover:shadow-accent/40 transition-all items-center gap-2"
         >
           <Plus size={16} />
           Drop a Zyng

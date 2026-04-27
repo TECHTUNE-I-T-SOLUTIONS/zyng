@@ -7,6 +7,20 @@ import { ArrowRight, ChevronLeft, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { supabase } from '@/lib/db/supabase';
 
+
+// Normalize phone number for consistent DB lookup
+function normalizePhone(phone: string) {
+  // Remove spaces, dashes, parentheses
+  let normalized = phone.replace(/[\s()-]/g, '');
+  // Ensure it starts with +
+  if (!normalized.startsWith('+')) {
+    // Optionally, add your country code here if you want to enforce it
+    normalized = '+234' + normalized; // Uncomment for Nigeria default
+  }
+  return normalized;
+}
+
+
 export default function LoginPage() {
   const [phoneNumber, setPhoneNumber] = useState('');
   const [password, setPassword] = useState('');
@@ -35,10 +49,12 @@ export default function LoginPage() {
     setIsLoading(true);
     setError('');
     try {
+
+      const normalizedPhone = normalizePhone(phoneNumber);
       const { data: userRecord, error: lookupError } = await supabase
         .from('users')
         .select('email, status')
-        .eq('phone', phoneNumber.trim())
+        .eq('phone', normalizedPhone)
         .single();
 
       if (lookupError) throw lookupError;

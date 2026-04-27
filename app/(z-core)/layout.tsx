@@ -1,21 +1,22 @@
 'use client';
 
-import { useState } from 'react';
 import Link from 'next/link';
+import { useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { 
   Rss, 
-  PlusSquare, 
-  UserCircle, 
   MessageSquare, 
-  Flame, 
   TrendingUp,
   Zap,
   Briefcase,
   Search,
   Bell,
-  LogOut
+  LogOut,
+  Briefcase as Jobs,
+  Mail,
+  Users,
+  Gift
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '@/lib/utils';
@@ -24,8 +25,10 @@ import { userService } from '@/lib/services/userService';
 export default function ZLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const { data: user } = useQuery({ queryKey: ['z-layout-me'], queryFn: () => userService.getCurrentUser() });
-  
+
+  // Main bottom nav
   const navItems = [
     { name: 'Zynging', href: '/z-feed', icon: Rss },
     { name: 'Pro Hub', href: '/z-pro', icon: Briefcase },
@@ -33,40 +36,73 @@ export default function ZLayout({ children }: { children: React.ReactNode }) {
     { name: 'Events', href: '/z-events', icon: TrendingUp },
     { name: 'Marketplace', href: '/z-marketplace', icon: Zap },
   ];
+  // Sidebar-only links (not in bottom nav)
+  const sidebarLinks = [
+    { name: 'Jobs', href: '/z-jobs', icon: Jobs },
+    { name: 'Messages', href: '/z-messages', icon: Mail },
+    { name: 'Notifications', href: '/z-notifications', icon: Bell },
+    { name: 'Referrals', href: '/z-referral', icon: Gift },
+  ];
+  // All links for desktop sidebar (main + sidebar)
+  const allSidebarLinks = [
+    ...navItems,
+    ...sidebarLinks,
+    { name: 'Profile', href: '/z-profile', icon: Users },
+  ];
 
   return (
-    <div className="flex h-screen bg-background text-foreground overflow-hidden font-sans">
-      {/* Left Sidebar */}
-      <aside className="w-64 border-r border-border flex flex-col p-6 shrink-0">
-        <div className="mb-10">
-          <Link href="/z-feed">
+    <div className={cn("flex h-screen bg-background text-foreground font-sans", mobileSidebarOpen ? "overflow-hidden" : "")}> 
+
+      {/* Mobile Sidebar Toggle Button (only one, in header) */}
+
+      {/* Sidebar (Desktop & Mobile) */}
+      <aside
+        className={
+          cn(
+            "w-64 border-r border-border flex flex-col p-6 shrink-0 bg-background z-50 transition-transform duration-300 lg:translate-x-0 lg:static lg:flex",
+            mobileSidebarOpen ? "fixed top-0 left-0 h-full translate-x-0" : "-translate-x-full lg:translate-x-0 hidden"
+          )
+        }
+        style={{
+          boxShadow: mobileSidebarOpen ? '0 2px 16px 0 rgba(0,0,0,0.12)' : undefined,
+          pointerEvents: mobileSidebarOpen ? 'auto' : 'auto',
+        }}
+      >
+        {/* Close button for mobile */}
+        <div className="flex justify-between items-center mb-10 lg:mb-10">
+          <Link href="/z-feed" onClick={() => setMobileSidebarOpen(false)}>
             <h1 className="text-accent text-3xl font-black tracking-tighter">ZYNG</h1>
           </Link>
-          <div className="text-[10px] uppercase tracking-widest text-accent/60 font-bold mt-1">
-            UNILORIN Campus
-          </div>
+          <button
+            className="lg:hidden text-foreground/60 hover:text-accent p-2"
+            onClick={() => setMobileSidebarOpen(false)}
+            aria-label="Close sidebar"
+          >
+            <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+          </button>
         </div>
-        
+        {/* <div className="text-[10px] uppercase tracking-widest text-accent/60 font-bold mt-1 mb-6 lg:mb-1">UNILORIN Campus</div> */}
+        {/* Sidebar links: mobile = sidebarLinks, desktop = allSidebarLinks */}
         <nav className="space-y-2 flex-1">
-          {navItems.map((item) => (
+          {(mobileSidebarOpen ? sidebarLinks : allSidebarLinks).map((item) => (
             <Link 
               key={item.href} 
               href={item.href}
+              onClick={() => setMobileSidebarOpen(false)}
               className={cn(
-                "flex items-center gap-3 p-3 rounded-xl transition-all border-l-4",
+                "flex items-center gap-3 p-3 rounded-xl transition-all border-l-4 text-sm",
                 pathname === item.href 
                   ? "bg-muted text-accent border-accent" 
                   : "text-foreground/60 border-transparent hover:bg-muted hover:text-foreground"
               )}
             >
-              <item.icon size={20} />
+              <item.icon size={18} />
               <span className="font-semibold">{item.name}</span>
             </Link>
           ))}
         </nav>
-
-        {/* Zync (Persona) Switcher */}
-        <div className="mt-auto pt-6 border-t border-border">
+        {/* Zync (Persona) Switcher - Desktop sidebar only */}
+        <div className="mt-8 pt-6 border-t border-border hidden lg:block">
           <Link href="/z-personas" className="group">
             <div className="bg-gradient-to-tr from-accent/20 to-transparent p-4 rounded-2xl border border-accent/10 group-hover:border-accent/30 transition-all">
               <div className="flex items-center gap-3">
@@ -84,14 +120,71 @@ export default function ZLayout({ children }: { children: React.ReactNode }) {
           </Link>
         </div>
       </aside>
-
       {/* Main Content */}
-      <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        {children}
+      <main className={cn("flex-1 flex flex-col min-w-0 overflow-y-auto transition-all duration-300 relative", mobileSidebarOpen ? "blur-sm pointer-events-none select-none" : "")}> 
+        {/* Mobile Top Bar with icons */}
+        <div className="lg:hidden sticky top-0 z-30 bg-background/80 backdrop-blur-md border-b border-border px-2 py-2 flex justify-between items-center gap-2">
+          <button
+            onClick={() => setMobileSidebarOpen(true)}
+            className="p-2 text-foreground/60 hover:text-accent"
+            aria-label="Open menu"
+          >
+            <svg width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="18" x2="21" y2="18" /></svg>
+          </button>
+          <Link href="/z-feed">
+            <h1 className="text-accent text-xl font-black tracking-tighter">ZYNG</h1>
+          </Link>
+          <div className="flex items-center gap-2">
+            <Link href="/z-search" aria-label="Search"><Search size={20} className="text-foreground/60 hover:text-accent" /></Link>
+            <Link href="/z-notifications" aria-label="Notifications"><Bell size={20} className="text-foreground/60 hover:text-accent" /></Link>
+            <Link href="/z-personas" aria-label="Profile">
+              <div className="w-8 h-8 rounded-full bg-accent flex items-center justify-center font-bold text-black">
+                {user?.z_name?.[0]?.toUpperCase() || user?.full_name?.[0]?.toUpperCase() || 'Z'}
+              </div>
+            </Link>
+          </div>
+        </div>
+        <div className="flex-1 flex flex-col min-w-0">
+          {children}
+        </div>
+        {/* Floating Action Button for Drop a Zyng (only FAB, no text button) */}
+        <Link href="/z-create" className="lg:hidden fixed bottom-16 right-4 z-40 bg-accent text-black rounded-full shadow-lg flex items-center justify-center w-14 h-14 text-3xl font-black hover:bg-accent/90 transition-all">
+          +
+        </Link>
       </main>
+
+      {/* Bottom Navigation - Mobile Only */}
+      <nav className="fixed bottom-0 left-0 right-0 z-30 bg-background border-t border-border flex justify-around items-center py-1 lg:hidden">
+        {navItems.map((item) => (
+          <Link
+            key={item.href}
+            href={item.href}
+            className={cn(
+              "flex flex-col items-center justify-center gap-0.5 px-1 py-1 text-[11px] font-semibold",
+              pathname === item.href ? "text-accent" : "text-foreground/60 hover:text-accent"
+            )}
+            aria-label={item.name}
+          >
+            <item.icon size={22} />
+            <span className="text-[10px] mt-0.5">{item.name.split(' ')[0]}</span>
+          </Link>
+        ))}
+      </nav>
 
       {/* Right Sidebar - Desktop Only */}
       <aside className="w-72 border-l border-border p-6 flex flex-col shrink-0 hidden lg:flex">
+        {/* Desktop Search Bar */}
+        <div className="mb-6">
+          <form action="/z-search" method="get" className="flex items-center gap-2 bg-muted rounded-xl px-3 py-2">
+            <Search size={18} className="text-foreground/40" />
+            <input
+              type="text"
+              name="q"
+              placeholder="Search..."
+              className="bg-transparent outline-none flex-1 text-sm"
+            />
+          </form>
+        </div>
         <section className="mb-8">
           <h2 className="text-[11px] font-black uppercase tracking-widest text-foreground/30 mb-4 flex items-center gap-2">
             <TrendingUp size={12} /> Campus Trends
