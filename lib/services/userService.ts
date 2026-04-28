@@ -13,7 +13,16 @@ export const userService = {
       .single();
 
     if (error) throw error;
-    return data;
+    // Normalize related records to singular keys for ease of use in UI
+    const normalized = {
+      ...data,
+      school: Array.isArray(data?.schools) ? data.schools[0] : data?.schools || null,
+      faculty: Array.isArray(data?.faculties) ? data.faculties[0] : data?.faculties || null,
+      department: Array.isArray(data?.departments) ? data.departments[0] : data?.departments || null,
+      personas: data?.personas || [],
+    } as any;
+
+    return normalized;
   },
 
   async updateProfile(updates: Partial<User>) {

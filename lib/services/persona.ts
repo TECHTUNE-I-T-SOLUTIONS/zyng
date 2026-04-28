@@ -1,4 +1,4 @@
-import { supabase } from './auth';
+import { supabase } from '@/lib/db/supabase';
 
 export async function createPersona(userId: string, displayName: string) {
   const { data, error } = await supabase

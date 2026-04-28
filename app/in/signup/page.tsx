@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -57,6 +58,13 @@ export default function SignupPage() {
     security_answer: '',
     status: 'regular' as 'regular' | 'alumni',
   });
+
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    const ref = searchParams?.get?.('ref');
+    if (ref) update({ referral_code: ref });
+  }, [searchParams]);
 
   const update = (patch: Partial<typeof formData>) => setFormData((s) => ({ ...s, ...patch }));
 

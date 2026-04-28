@@ -1,4 +1,4 @@
-import { supabase } from './auth';
+import { supabase } from '@/lib/db/supabase';
 
 export async function getFeed(campusId: string, cursor?: string, limit: number = 10) {
   let query = supabase

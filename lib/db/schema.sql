@@ -384,3 +384,144 @@ END;
 $$ LANGUAGE plpgsql;
 
 CREATE TRIGGER tr_on_job AFTER INSERT ON opportunities FOR EACH ROW EXECUTE FUNCTION fn_match_skills();
+
+
+-- ZYNG MAINTENANCE MODE TABLES
+-- Run this in Supabase SQL editor
+
+CREATE TABLE IF NOT EXISTS maintenance_settings (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    is_enabled BOOLEAN NOT NULL DEFAULT false,
+    title TEXT NOT NULL DEFAULT 'Maintenance in Progress',
+    message TEXT NOT NULL DEFAULT 'We are making improvements to Zyng. You may experience brief interruptions while updates are being applied.',
+    updated_by UUID REFERENCES users(id) ON DELETE SET NULL,
+    updated_at TIMESTAMPTZ DEFAULT now(),
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS maintenance_audit_logs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    maintenance_id UUID REFERENCES maintenance_settings(id) ON DELETE CASCADE,
+    admin_id UUID REFERENCES admins(id) ON DELETE SET NULL,
+    action TEXT NOT NULL,
+    previous_state JSONB,
+    new_state JSONB,
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+
+INSERT INTO maintenance_settings (is_enabled, title, message)
+SELECT false, 'Maintenance in Progress', 'We are making improvements to Zyng. You may experience brief interruptions while updates are being applied.'
+WHERE NOT EXISTS (SELECT 1 FROM maintenance_settings);
+
+CREATE OR REPLACE FUNCTION fn_touch_maintenance_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = now();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS tr_touch_maintenance_updated_at ON maintenance_settings;
+CREATE TRIGGER tr_touch_maintenance_updated_at
+BEFORE UPDATE ON maintenance_settings
+FOR EACH ROW EXECUTE FUNCTION fn_touch_maintenance_updated_at();
+
+CREATE OR REPLACE FUNCTION fn_broadcast_maintenance_notifications()
+RETURNS TRIGGER AS $$
+DECLARE
+    notice_title TEXT;
+    notice_message TEXT;
+BEGIN
+    IF NEW.is_enabled IS DISTINCT FROM OLD.is_enabled THEN
+        IF NEW.is_enabled THEN
+            notice_title := COALESCE(NEW.title, 'Maintenance in Progress');
+            notice_message := COALESCE(NEW.message, 'We are making improvements to Zyng. Please bear with us while we apply updates and polish the experience.');
+
+            INSERT INTO notifications (user_id, type, title, message, link)
+            SELECT id, 'maintenance_on', notice_title, notice_message, '/z-notifications'
+            FROM users;
+
+            INSERT INTO admin_notifications (target_level, type, title, message)
+            VALUES
+                ('super', 'maintenance_on', notice_title, notice_message),
+                ('admin', 'maintenance_on', notice_title, notice_message),
+                ('sub', 'maintenance_on', notice_title, notice_message),
+                ('moderator', 'maintenance_on', notice_title, notice_message);
+        ELSE
+            notice_title := COALESCE(NEW.title, 'Maintenance Complete');
+            notice_message := 'Maintenance has ended. Thank you for bearing with us. Look forward to the new features and improvements now live on Zyng.';
+
+            INSERT INTO notifications (user_id, type, title, message, link)
+            SELECT id, 'maintenance_off', notice_title, notice_message, '/z-notifications'
+            FROM users;
+
+            INSERT INTO admin_notifications (target_level, type, title, message)
+            VALUES
+                ('super', 'maintenance_off', notice_title, notice_message),
+                ('admin', 'maintenance_off', notice_title, notice_message),
+                ('sub', 'maintenance_off', notice_title, notice_message),
+                ('moderator', 'maintenance_off', notice_title, notice_message);
+        END IF;
+    END IF;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS tr_broadcast_maintenance_notifications ON maintenance_settings;
+CREATE TRIGGER tr_broadcast_maintenance_notifications
+AFTER UPDATE ON maintenance_settings
+FOR EACH ROW EXECUTE FUNCTION fn_broadcast_maintenance_notifications();
+
+
+-- zyng_referral_and_rls.sql
+-- 1. Function to auto-generate referral code starting with 'Z' and unique
+CREATE OR REPLACE FUNCTION generate_referral_code()
+RETURNS TEXT AS $$
+DECLARE
+  new_code TEXT;
+BEGIN
+  LOOP
+    new_code := 'Z' || substr(md5(random()::text), 1, 7);
+    EXIT WHEN NOT EXISTS (SELECT 1 FROM users WHERE referral_code = new_code);
+  END LOOP;
+  RETURN new_code;
+END;
+$$ LANGUAGE plpgsql;
+
+-- 2. Trigger to set referral_code on insert if not provided
+CREATE OR REPLACE FUNCTION set_referral_code()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF NEW.referral_code IS NULL OR NEW.referral_code = '' THEN
+    NEW.referral_code := generate_referral_code();
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_set_referral_code ON users;
+CREATE TRIGGER trg_set_referral_code
+BEFORE INSERT ON users
+FOR EACH ROW
+EXECUTE FUNCTION set_referral_code();
+
+-- 3. RLS: Enable and add read policies for all relevant tables
+-- ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+-- ALTER TABLE schools ENABLE ROW LEVEL SECURITY;
+-- ALTER TABLE faculties ENABLE ROW LEVEL SECURITY;
+-- ALTER TABLE departments ENABLE ROW LEVEL SECURITY;
+-- ALTER TABLE personas ENABLE ROW LEVEL SECURITY;
+-- ALTER TABLE posts ENABLE ROW LEVEL SECURITY;
+-- ALTER TABLE replies ENABLE ROW LEVEL SECURITY;
+-- ALTER TABLE reactions ENABLE ROW LEVEL SECURITY;
+
+-- Allow read for all (adjust as needed for production)
+CREATE POLICY users_read_all ON users FOR SELECT USING (true);
+CREATE POLICY schools_read_all ON schools FOR SELECT USING (true);
+CREATE POLICY faculties_read_all ON faculties FOR SELECT USING (true);
+CREATE POLICY departments_read_all ON departments FOR SELECT USING (true);
+CREATE POLICY personas_read_all ON personas FOR SELECT USING (true);
+CREATE POLICY posts_read_all ON posts FOR SELECT USING (true);
+CREATE POLICY replies_read_all ON replies FOR SELECT USING (true);
+CREATE POLICY reactions_read_all ON reactions FOR SELECT USING (true);

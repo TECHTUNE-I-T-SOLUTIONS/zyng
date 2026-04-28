@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
+import { trendsService } from '@/lib/services/trendsService';
 import { 
   Rss, 
   MessageSquare, 
@@ -21,12 +22,32 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '@/lib/utils';
 import { userService } from '@/lib/services/userService';
+import { ThemeToggle } from '@/components/theme-toggle';
 
 export default function ZLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const { data: user } = useQuery({ queryKey: ['z-layout-me'], queryFn: () => userService.getCurrentUser() });
+
+  const { data: trends } = useQuery({ queryKey: ['trending_hashtags'], queryFn: () => trendsService.getTrendingHashtags(), initialData: [] });
+  const { data: mood } = useQuery({ queryKey: ['platform_mood'], queryFn: () => trendsService.getPlatformMood(), initialData: null });
+
+  const shareInvite = async () => {
+    const code = user?.referral_code || 'ZYNG-USER-XXXX';
+    const url = `${window.location.origin}/in/signup?ref=${encodeURIComponent(code)}`;
+    try {
+      if ((navigator as any).share) {
+        await (navigator as any).share({ title: 'Join Zyng', text: 'Join Zyng with my referral code', url });
+      } else {
+        await navigator.clipboard.writeText(url);
+        alert('Invite link copied to clipboard');
+      }
+    } catch (err) {
+      console.error(err);
+      try { await navigator.clipboard.writeText(url); alert('Invite link copied to clipboard'); } catch {}
+    }
+  };
 
   // Main bottom nav
   const navItems = [
@@ -42,12 +63,12 @@ export default function ZLayout({ children }: { children: React.ReactNode }) {
     { name: 'Messages', href: '/z-messages', icon: Mail },
     { name: 'Notifications', href: '/z-notifications', icon: Bell },
     { name: 'Referrals', href: '/z-referral', icon: Gift },
+    { name: 'Profile', href: '/z-profile', icon: Users },
   ];
   // All links for desktop sidebar (main + sidebar)
   const allSidebarLinks = [
     ...navItems,
     ...sidebarLinks,
-    { name: 'Profile', href: '/z-profile', icon: Users },
   ];
 
   return (
@@ -135,22 +156,25 @@ export default function ZLayout({ children }: { children: React.ReactNode }) {
             <h1 className="text-accent text-xl font-black tracking-tighter">ZYNG</h1>
           </Link>
           <div className="flex items-center gap-2">
-            <Link href="/z-search" aria-label="Search"><Search size={20} className="text-foreground/60 hover:text-accent" /></Link>
-            <Link href="/z-notifications" aria-label="Notifications"><Bell size={20} className="text-foreground/60 hover:text-accent" /></Link>
-            <Link href="/z-personas" aria-label="Profile">
-              <div className="w-8 h-8 rounded-full bg-accent flex items-center justify-center font-bold text-black">
-                {user?.z_name?.[0]?.toUpperCase() || user?.full_name?.[0]?.toUpperCase() || 'Z'}
-              </div>
-            </Link>
+              <Link href="/z-search" aria-label="Search"><Search size={20} className="text-foreground/60 hover:text-accent" /></Link>
+              <Link href="/z-notifications" aria-label="Notifications"><Bell size={20} className="text-foreground/60 hover:text-accent" /></Link>
+              <ThemeToggle />
+              <Link href="/z-personas" aria-label="Profile">
+                <div className="w-8 h-8 rounded-full bg-accent flex items-center justify-center font-bold text-black">
+                  {user?.z_name?.[0]?.toUpperCase() || user?.full_name?.[0]?.toUpperCase() || 'Z'}
+                </div>
+              </Link>
           </div>
         </div>
         <div className="flex-1 flex flex-col min-w-0">
           {children}
         </div>
-        {/* Floating Action Button for Drop a Zyng (only FAB, no text button) */}
-        <Link href="/z-create" className="lg:hidden fixed bottom-16 right-4 z-40 bg-accent text-black rounded-full shadow-lg flex items-center justify-center w-14 h-14 text-3xl font-black hover:bg-accent/90 transition-all">
-          +
-        </Link>
+        {/* Floating Action Button for Drop a Zyng (only FAB, no text button) - show only on z-feed */}
+        {pathname?.startsWith('/z-feed') && (
+          <Link href="/z-create" className="lg:hidden fixed bottom-16 right-4 z-40 bg-accent text-black rounded-full shadow-lg flex items-center justify-center w-14 h-14 text-3xl font-black hover:bg-accent/90 transition-all">
+            +
+          </Link>
+        )}
       </main>
 
       {/* Bottom Navigation - Mobile Only */}
@@ -190,12 +214,16 @@ export default function ZLayout({ children }: { children: React.ReactNode }) {
             <TrendingUp size={12} /> Campus Trends
           </h2>
           <div className="space-y-4">
-            {['#MidtermMeltdown', '#EngineeringFair', '#CafePrices'].map((tag) => (
-              <div key={tag} className="group cursor-pointer">
-                <div className="text-sm font-bold group-hover:text-accent transition-colors">{tag}</div>
-                <div className="text-[10px] text-foreground/40">1.2k Zyngs</div>
-              </div>
-            ))}
+            {(trends || []).length > 0 ? (
+              trends.map((t: any) => (
+                <div key={t.hashtag} className="group cursor-pointer">
+                  <div className="text-sm font-bold group-hover:text-accent transition-colors">{t.hashtag}</div>
+                  <div className="text-[10px] text-foreground/40">{t.usage_count} Zyngs</div>
+                </div>
+              ))
+            ) : (
+              <div className="text-sm text-foreground/40">No trending hashtags yet.</div>
+            )}
           </div>
         </section>
 
@@ -204,22 +232,25 @@ export default function ZLayout({ children }: { children: React.ReactNode }) {
           <div className="bg-muted rounded-2xl p-4 border border-border">
             <div className="text-xs mb-2 flex justify-between">
               <span className="opacity-60">Campus Mood</span>
-              <span className="text-accent font-bold">Electric</span>
+              <span className="text-accent font-bold">{mood ? (mood.mood_score > 0 ? 'Electric' : (mood.mood_score < 0 ? 'Sour' : 'Neutral')) : 'Neutral'}</span>
             </div>
             <div className="h-1.5 w-full bg-border rounded-full overflow-hidden">
               <motion.div 
                 initial={{ width: 0 }}
-                animate={{ width: '85%' }}
+                animate={{ width: `${mood?.positive_pct ?? 50}%` }}
                 className="h-full bg-gradient-to-r from-orange-500 to-accent" 
               />
             </div>
-            <div className="text-[10px] text-foreground/30 mt-2">Based on 4.5k interactions</div>
+            <div className="text-[10px] text-foreground/30 mt-2">Based on {mood?.total_posts ?? 0} posts</div>
           </div>
         </section>
 
         <div className="mt-auto">
+           <div className="mb-4">
+             <ThemeToggle />
+           </div>
            <div className="text-[10px] text-foreground/40 font-medium mb-3">You have <span className="text-accent">3 Invites</span> left.</div>
-           <button className="w-full bg-muted border border-border rounded-xl py-3 text-[10px] font-black hover:bg-muted/80 transition-all uppercase tracking-widest text-foreground">
+           <button onClick={shareInvite} className="w-full bg-muted border border-border rounded-xl py-3 text-[10px] font-black hover:bg-muted/80 transition-all uppercase tracking-widest text-foreground">
              Share the Invite
            </button>
         </div>

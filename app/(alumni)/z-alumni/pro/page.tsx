@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { alumniService } from '@/lib/services/alumniService';
 import { resumeService } from '@/lib/services/resumeService';
@@ -11,6 +12,8 @@ export default function AlumniProPage() {
   const queryClient = useQueryClient();
   const [resumeText, setResumeText] = useState('');
   const [opportunityForm, setOpportunityForm] = useState({ title: '', company: '', description: '', type: '', skills_required: '' });
+  const fileRef = useRef<HTMLInputElement | null>(null);
+  const [attachments, setAttachments] = useState<string[]>([]);
 
   const { data, isLoading } = useQuery({
     queryKey: ['alumni-me'],
@@ -56,9 +59,30 @@ export default function AlumniProPage() {
       description: opportunityForm.description,
       type: opportunityForm.type,
       skills_required: opportunityForm.skills_required.split(',').map((s) => s.trim()).filter(Boolean),
+      attachments: attachments.length ? attachments : null,
       school_id: data.user.school_id,
     });
     queryClient.invalidateQueries({ queryKey: ['alumni-me'] });
+  };
+
+  const handleAttachPick = () => fileRef.current?.click();
+  const handleAttachChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const dataUrl = reader.result as string;
+      try {
+        const resourceType = file.type.startsWith('image/') ? 'image' : 'raw';
+        const res = await fetch('/api/uploads', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ filename: file.name, dataUrl, resourceType }) });
+        const json = await res.json();
+        if (res.ok && json.url) setAttachments((s) => [...s, json.url]);
+        else console.error('Attach upload failed', json);
+      } catch (err) {
+        console.error(err);
+      }
+    };
+    reader.readAsDataURL(file);
   };
 
   const applyToOpportunity = async (opportunityId: string) => {
@@ -103,6 +127,11 @@ export default function AlumniProPage() {
             <input value={opportunityForm.type} onChange={(e) => setOpportunityForm({ ...opportunityForm, type: e.target.value })} className="w-full rounded-2xl bg-black/20 border border-white/10 px-4 py-3 text-sm" placeholder="Type" />
             <textarea value={opportunityForm.description} onChange={(e) => setOpportunityForm({ ...opportunityForm, description: e.target.value })} className="w-full rounded-2xl bg-black/20 border border-white/10 px-4 py-3 text-sm min-h-32" placeholder="Description" />
             <input value={opportunityForm.skills_required} onChange={(e) => setOpportunityForm({ ...opportunityForm, skills_required: e.target.value })} className="w-full rounded-2xl bg-black/20 border border-white/10 px-4 py-3 text-sm" placeholder="Skills required, comma separated" />
+            <div className="flex items-center gap-3">
+              <input ref={fileRef} type="file" onChange={handleAttachChange} className="hidden" />
+              <button onClick={handleAttachPick} className="px-3 py-2 bg-black/20 rounded-2xl text-sm">Add Attachment</button>
+              <div className="text-sm text-white/40">{attachments.length} attachment(s) added</div>
+            </div>
             <button onClick={createOpportunity} className="bg-white text-black px-4 py-3 rounded-2xl font-black uppercase text-xs tracking-widest flex items-center gap-2"><Plus size={14} /> Publish Opportunity</button>
           </div>
         </section>

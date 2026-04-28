@@ -42,6 +42,7 @@ export interface User {
   
   hobbies?: string[];
   skills?: string[];
+  avatar_url?: string;
   bio?: string;
   portfolio_data?: any;
   
@@ -156,4 +157,16 @@ export interface Admin {
   level: AdminLevel;
   is_active: boolean;
   created_at: string;
+}
+
+export interface Portfolio {
+  id: string;
+  user_id: string;
+  title?: string;
+  summary?: string;
+  skills?: string[];
+  entries?: any; // experience/education structured JSON
+  attachments?: Array<{ url: string; filename?: string; mime?: string; size?: number }>;
+  created_at?: string;
+  updated_at?: string;
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { userService } from '@/lib/services/userService';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -9,6 +9,7 @@ import { supabase } from '@/lib/db/supabase';
 
 export default function ProfilePage() {
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const fileRef = useRef<HTMLInputElement | null>(null);
   const { data: user, isLoading } = useQuery({
     queryKey: ['me'],
     queryFn: () => userService.getCurrentUser(),
@@ -17,6 +18,36 @@ export default function ProfilePage() {
   const handleSignOut = async () => {
     await supabase.auth.signOut();
     window.location.href = '/login';
+  };
+
+  const handleAvatarPick = () => fileRef.current?.click();
+
+  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const dataUrl = reader.result as string;
+      try {
+        const res = await fetch('/api/uploads', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ filename: file.name, dataUrl, resourceType: 'image' }),
+        });
+        const json = await res.json();
+        if (res.ok && json.url) {
+          await userService.updateProfile({ avatar_url: json.url });
+          window.location.reload();
+        } else {
+          console.error('Avatar upload failed', json);
+          alert('Avatar upload failed');
+        }
+      } catch (err) {
+        console.error(err);
+        alert('Avatar upload failed');
+      }
+    };
+    reader.readAsDataURL(file);
   };
 
   if (isLoading) {
@@ -44,7 +75,7 @@ export default function ProfilePage() {
       <div className="max-w-4xl mx-auto">
         <header className="flex items-center justify-between mb-10">
           <h1 className="text-4xl font-black tracking-tighter uppercase">Zynger Profile</h1>
-          <button className="p-3 bg-muted border border-border rounded-xl hover:bg-muted/80 transition-all">
+          <button title="Settings" className="p-3 bg-muted border border-border rounded-xl hover:bg-muted/80 transition-all">
             <Settings size={20} />
           </button>
         </header>
@@ -57,8 +88,12 @@ export default function ProfilePage() {
               className="bg-muted border border-border rounded-[2.5rem] p-8 shadow-2xl shadow-accent/5"
             >
               <div className="flex items-center gap-6 mb-8">
-                <div className="w-24 h-24 rounded-3xl bg-accent flex items-center justify-center text-4xl font-black text-black">
-                  {user.full_name?.[0] || user.z_name?.[0] || 'U'}
+                <div className="w-24 h-24 rounded-3xl bg-accent overflow-hidden flex items-center justify-center text-4xl font-black text-black">
+                  {user.avatar_url ? (
+                    <img src={user.avatar_url} alt="avatar" className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">{user.full_name?.[0] || user.z_name?.[0] || 'U'}</div>
+                  )}
                 </div>
                 <div>
                   <h2 className="text-3xl font-black tracking-tight">{user.full_name || 'Zyng User'}</h2>
@@ -79,6 +114,10 @@ export default function ProfilePage() {
                   </div>
                   <div className="text-sm font-bold">{user.trust_score >= 100 ? 'Verified' : 'Newcomer'}</div>
                 </div>
+              </div>
+              <div className="mt-4">
+                <input title="Upload Avatar" ref={fileRef} type="file" accept="image/*" onChange={handleAvatarChange} className="hidden" />
+                <button onClick={handleAvatarPick} className="mt-3 bg-muted px-4 py-2 rounded-xl text-sm">Upload Avatar</button>
               </div>
             </motion.div>
 
@@ -161,6 +200,7 @@ export default function ProfilePage() {
               className="relative w-full max-w-sm bg-background border border-border p-8 rounded-[2.5rem] text-center shadow-2xl"
             >
               <button 
+                title="Close"
                 onClick={() => setShowLogoutModal(false)}
                 className="absolute top-6 right-6 text-foreground/20 hover:text-foreground transition-colors"
               >

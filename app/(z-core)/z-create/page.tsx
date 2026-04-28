@@ -9,6 +9,7 @@ import Link from 'next/link';
 import { userService } from '@/lib/services/userService';
 import { postService } from '@/lib/services/postService';
 import { getPersonas } from '@/lib/services/persona';
+import { useRef } from 'react';
 
 type PostType = 'regular' | 'confession' | 'poll' | 'hot_take' | 'missed_connection';
 
@@ -16,6 +17,9 @@ export default function ZCreate() {
   const router = useRouter();
   const [activeType, setActiveType] = useState<PostType>('regular');
   const [content, setContent] = useState('');
+  const [hashtag, setHashtag] = useState('');
+  const [mediaUrl, setMediaUrl] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const { data: user, isLoading: userLoading } = useQuery({ queryKey: ['me'], queryFn: () => userService.getCurrentUser() });
@@ -43,11 +47,37 @@ export default function ZCreate() {
         school_id: user.school_id,
         type: activeType,
         content,
+        hashtag: hashtag || null,
+        media_url: mediaUrl || null,
       });
       router.push('/z-feed');
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleFilePick = () => fileInputRef.current?.click();
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const dataUrl = reader.result as string;
+      try {
+        const res = await fetch('/api/uploads', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ filename: file.name, dataUrl }),
+        });
+        const json = await res.json();
+        if (res.ok && json.url) setMediaUrl(json.url);
+        else console.error('Upload error', json);
+      } catch (err) {
+        console.error('Upload failed', err);
+      }
+    };
+    reader.readAsDataURL(file);
   };
 
   return (
@@ -114,9 +144,16 @@ export default function ZCreate() {
           </div>
 
           <div className="flex items-center gap-4 pt-8 border-t border-border">
-            <button className="flex items-center gap-2 px-4 py-2 bg-muted rounded-xl text-xs font-bold hover:bg-muted/80 transition-all text-foreground/60">
+            <input title="Media" ref={fileInputRef} type="file" accept="image/*,video/*" onChange={handleFileChange} className="hidden" />
+            <button onClick={handleFilePick} className="flex items-center gap-2 px-4 py-2 bg-muted rounded-xl text-xs font-bold hover:bg-muted/80 transition-all text-foreground/60">
               <ImageIcon size={16} /> Add Media
             </button>
+            <input
+              value={hashtag}
+              onChange={(e) => setHashtag(e.target.value)}
+              placeholder="#hashtag"
+              className="bg-background border border-border rounded-2xl py-2 px-3 text-sm placeholder:text-foreground/30"
+            />
             {activeType === 'poll' && (
               <button className="flex items-center gap-2 px-4 py-2 bg-indigo-500/10 rounded-xl text-xs font-bold hover:bg-indigo-500/20 transition-all text-indigo-400 border border-indigo-500/20">
                 <PlusSquare size={16} /> Add Options
@@ -124,6 +161,12 @@ export default function ZCreate() {
             )}
             <div className="ml-auto text-[10px] font-black text-foreground/20 uppercase tracking-widest">{content.length} / 500</div>
           </div>
+          {mediaUrl && (
+            <div className="mt-4">
+              <div className="text-xs font-bold mb-2">Media preview</div>
+              <img src={mediaUrl} alt="upload preview" className="w-full max-w-md rounded-xl" />
+            </div>
+          )}
         </div>
       </div>
     </div>

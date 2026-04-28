@@ -37,6 +37,7 @@ export const postService = {
         type: post.type,
         content: post.content,
         media_url: post.media_url,
+        hashtag: post.hashtag,
         poll_options: post.poll_options,
         expires_at: post.expires_at,
       })

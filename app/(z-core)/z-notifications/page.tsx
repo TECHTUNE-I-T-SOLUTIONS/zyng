@@ -1,8 +1,9 @@
-'use client';
+"use client";
 
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/db/supabase';
+import { userService } from '@/lib/services/userService';
 import { motion } from 'framer-motion';
 import { Heart, MessageSquare, UserPlus, Zap, Bell, Loader2, School, ShieldAlert, FileText, BadgeCheck, BriefcaseBusiness, Users, MessageCircle, Megaphone, GraduationCap } from 'lucide-react';
 
@@ -35,16 +36,24 @@ const notificationMeta: Record<string, { icon: any; color: string; label: string
 };
 
 export default function NotificationsPage() {
-  const { data: notifications, isLoading } = useQuery({
-    queryKey: ['notifications'],
+  const { data: me, isLoading: userLoading } = useQuery({
+    queryKey: ['me'],
+    queryFn: () => userService.getCurrentUser(),
+  });
+
+  const { data: notifications, isLoading, isError, error } = useQuery({
+    queryKey: ['notifications', me?.id],
     queryFn: async () => {
+      if (!me?.id) return [];
       const { data, error } = await supabase
         .from('notifications')
         .select('*')
+        .eq('user_id', me.id)
         .order('created_at', { ascending: false });
       if (error) throw error;
       return data;
     },
+    enabled: !!me?.id,
   });
 
   return (
@@ -58,14 +67,32 @@ export default function NotificationsPage() {
           <p className="text-foreground/40 font-medium italic">Stay updated with your campus interactions.</p>
         </header>
 
-        {isLoading ? (
+        {userLoading ? (
           <div className="flex justify-center py-20">
             <Loader2 className="w-10 h-10 text-accent animate-spin" />
           </div>
-        ) : !notifications || notifications.length === 0 ? (
+        ) : !me ? (
           <div className="text-center py-20 bg-muted/20 border border-dashed border-border rounded-[3rem]">
-            <p className="text-foreground/40 font-bold italic">No new notifications. Start a conversation!</p>
+            <p className="text-foreground/40 font-bold italic mb-4">Please sign in to view your notifications.</p>
+            <Link href="/in/login" className="bg-accent text-black px-6 py-3 rounded-2xl font-black">Login</Link>
           </div>
+        ) : isLoading ? (
+          <div className="flex justify-center py-20">
+            <Loader2 className="w-10 h-10 text-accent animate-spin" />
+          </div>
+        ) : (
+          <>
+            <div className="mb-4 text-xs text-foreground/50">
+              <div>You have: {notifications ? notifications.length : 0} notifications</div>
+              {isError && (
+                <div className="mt-2 text-red-500">Error fetching notifications: {String((error as any)?.message || error)}</div>
+              )}
+            </div>
+
+            {(!notifications || notifications.length === 0) ? (
+              <div className="text-center py-20 bg-muted/20 border border-dashed border-border rounded-[3rem]">
+                <p className="text-foreground/40 font-bold italic">No new notifications. Start a conversation!</p>
+              </div>
         ) : (
           <div className="space-y-2">
             {notifications.map((notif, i) => {
@@ -108,13 +135,15 @@ export default function NotificationsPage() {
             })}
           </div>
         )}
+      </>
+        )}
 
         <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-3">
           <Link href="/z-referral" className="bg-muted/40 border border-border rounded-2xl p-4 hover:border-accent/30 transition-all">
             <div className="text-xs font-black uppercase tracking-widest text-foreground/30 mb-1">Referrals</div>
             <div className="text-sm font-semibold">Manage your referral code, signups, and rewards.</div>
           </Link>
-          <Link href="/z-admin/reports" className="bg-muted/40 border border-border rounded-2xl p-4 hover:border-accent/30 transition-all">
+          <Link href="/z-reports" className="bg-muted/40 border border-border rounded-2xl p-4 hover:border-accent/30 transition-all">
             <div className="text-xs font-black uppercase tracking-widest text-foreground/30 mb-1">Reports</div>
             <div className="text-sm font-semibold">Track report reviews and moderation updates.</div>
           </Link>

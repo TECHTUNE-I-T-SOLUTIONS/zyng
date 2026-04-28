@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { campusService } from '@/lib/services/campusService';
+import { userService } from '@/lib/services/userService';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Users, 
@@ -22,6 +23,13 @@ export default function RoomsPage() {
   const [activeTab, setActiveTab] = useState<'all' | 'joined'>('all');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState<string | null>(null);
+  const { data: user } = useQuery({ queryKey: ['me'], queryFn: () => userService.getCurrentUser() });
+
+  const [newRoomName, setNewRoomName] = useState('');
+  const [newRoomDescription, setNewRoomDescription] = useState('');
+  const [newRoomPrivate, setNewRoomPrivate] = useState(false);
+  const [newRoomPassword, setNewRoomPassword] = useState('');
+  const [creatingRoom, setCreatingRoom] = useState(false);
 
   const { data: rooms, isLoading } = useQuery({
     queryKey: ['rooms', activeTab],
@@ -108,7 +116,7 @@ export default function RoomsPage() {
                       <div className="w-6 h-6 rounded-full bg-accent/20 border border-accent/20" />
                       <div className="text-[10px] font-bold text-foreground/30 uppercase">Unilorin</div>
                     </div>
-                    <button className="p-3 bg-background border border-border rounded-xl group-hover:bg-accent group-hover:text-black transition-all">
+                    <button title="Join Room" className="p-3 bg-background border border-border rounded-xl group-hover:bg-accent group-hover:text-black transition-all">
                       <ChevronRight size={18} />
                     </button>
                   </div>
@@ -188,27 +196,55 @@ export default function RoomsPage() {
               <div className="space-y-6">
                 <div className="space-y-2">
                   <label className="text-[10px] font-black uppercase tracking-widest text-foreground/30 ml-2">Room Name</label>
-                  <input type="text" placeholder="e.g. Engineering Fair Prep" className="w-full bg-muted border border-border rounded-2xl p-4 text-sm font-bold" />
+                  <input value={newRoomName} onChange={(e) => setNewRoomName(e.target.value)} type="text" placeholder="e.g. Engineering Fair Prep" className="w-full bg-muted border border-border rounded-2xl p-4 text-sm font-bold" />
+                </div>
+                
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-foreground/30 ml-2">Description (optional)</label>
+                  <textarea value={newRoomDescription} onChange={(e) => setNewRoomDescription(e.target.value)} placeholder="Short description for the room" className="w-full bg-muted border border-border rounded-2xl p-4 text-sm font-bold min-h-[100px]" />
                 </div>
                 
                 <div className="grid grid-cols-2 gap-4">
-                  <button className="flex flex-col items-center gap-3 p-6 bg-accent/5 border border-accent/20 rounded-3xl text-accent">
+                  <button onClick={() => setNewRoomPrivate(false)} className={`flex flex-col items-center gap-3 p-6 rounded-3xl ${!newRoomPrivate ? 'bg-accent/5 border border-accent/20 text-accent' : 'bg-muted/10 border border-border text-foreground/60'}`}>
                     <Globe size={24} />
                     <span className="text-[10px] font-black uppercase">Public</span>
                   </button>
-                  <button className="flex flex-col items-center gap-3 p-6 bg-indigo-500/5 border border-indigo-500/20 rounded-3xl text-indigo-400">
+                  <button onClick={() => setNewRoomPrivate(true)} className={`flex flex-col items-center gap-3 p-6 rounded-3xl ${newRoomPrivate ? 'bg-indigo-500/5 border border-indigo-500/20 text-indigo-400' : 'bg-muted/10 border border-border text-foreground/60'}`}>
                     <Lock size={24} />
                     <span className="text-[10px] font-black uppercase">Private</span>
                   </button>
                 </div>
                 
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-foreground/30 ml-2">Set Password (Optional)</label>
-                  <input type="password" placeholder="Room Secret" className="w-full bg-muted border border-border rounded-2xl p-4 text-sm font-bold" />
-                </div>
+                {newRoomPrivate && (
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-foreground/30 ml-2">Set Password (Optional)</label>
+                    <input value={newRoomPassword} onChange={(e) => setNewRoomPassword(e.target.value)} type="password" placeholder="Room Secret" className="w-full bg-muted border border-border rounded-2xl p-4 text-sm font-bold" />
+                  </div>
+                )}
 
-                <button className="w-full bg-accent text-black py-5 rounded-[2rem] font-black uppercase tracking-widest text-sm shadow-xl shadow-accent/20 mt-8">
-                   Initialize Campus Space
+                <button disabled={!newRoomName.trim() || creatingRoom} onClick={async () => {
+                  if (!user?.id) return alert('Please login to create a room');
+                  setCreatingRoom(true);
+                  try {
+                    await campusService.createRoom({
+                      name: newRoomName.trim(),
+                      description: newRoomDescription.trim() || undefined,
+                      is_private: newRoomPrivate,
+                      password: newRoomPrivate ? newRoomPassword || null : null,
+                      school_id: user.school_id || null,
+                      created_by: user.id,
+                    });
+                    setShowCreateModal(false);
+                    // Ideally refresh rooms query; simple reload for now
+                    window.location.reload();
+                  } catch (err) {
+                    console.error(err);
+                    alert('Failed to create room.');
+                  } finally {
+                    setCreatingRoom(false);
+                  }
+                }} className="w-full bg-accent text-black py-5 rounded-[2rem] font-black uppercase tracking-widest text-sm shadow-xl shadow-accent/20 mt-8 disabled:opacity-40">
+                   {creatingRoom ? 'Creating...' : 'Initialize Campus Space'}
                 </button>
               </div>
             </motion.div>

@@ -114,7 +114,7 @@ export default function RecoveryPage() {
                 {step === 1 && (
                   <motion.form key="step1" initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -16 }} onSubmit={loadQuestion} className="space-y-4">
                     <Field icon={Phone} label="Phone Number">
-                      <input type="tel" required value={phone} onChange={(e) => { setPhone(e.target.value); setError(''); }} className="auth-input" placeholder="+1 (555) 000-0000" aria-invalid={!isPhoneValid && phone.length > 0} />
+                      <input  type="tel" required value={phone} onChange={(e) => { setPhone(e.target.value); setError(''); }} className="auth-input" placeholder="+1 (555) 000-0000" aria-invalid={!isPhoneValid && phone.length > 0} />
                     </Field>
                     <button type="submit" className="btn w-full" disabled={loading || !isPhoneValid}>{loading ? <Loader2 className="animate-spin" /> : 'Continue'}</button>
                   </motion.form>
@@ -136,7 +136,7 @@ export default function RecoveryPage() {
                 {step === 3 && (
                   <motion.form key="step3" initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} onSubmit={submitReset} className="space-y-4">
                     <Field icon={Lock} label="New Passcode">
-                      <input type="password" required value={newPassword} onChange={(e) => { setNewPassword(e.target.value); setError(''); }} className="auth-input" placeholder="••••••••" aria-invalid={!isPasswordValid && newPassword.length > 0} />
+                      <input  type="password" required value={newPassword} onChange={(e) => { setNewPassword(e.target.value); setError(''); }} className="auth-input" placeholder="••••••••" aria-invalid={!isPasswordValid && newPassword.length > 0} />
                     </Field>
                     <button type="submit" className="btn w-full" disabled={loading || !isPasswordValid}>{loading ? <Loader2 className="animate-spin" /> : 'Update Passcode'}</button>
                   </motion.form>

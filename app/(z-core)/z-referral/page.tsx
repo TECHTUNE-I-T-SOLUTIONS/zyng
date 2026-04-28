@@ -18,6 +18,22 @@ export default function ReferralPage() {
     alert('Code copied!');
   };
 
+  const shareInvite = async () => {
+    const url = `${window.location.origin}/in/signup?ref=${encodeURIComponent(code)}`;
+    try {
+      if ((navigator as any).share) {
+        await (navigator as any).share({ title: 'Join Zyng', text: 'Join Zyng with my referral code', url });
+      } else {
+        await navigator.clipboard.writeText(url);
+        alert('Invite link copied to clipboard');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Unable to share. Link copied to clipboard.');
+      try { await navigator.clipboard.writeText(url); } catch {}
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex-1 flex items-center justify-center">
@@ -49,14 +65,15 @@ export default function ReferralPage() {
             <h2 className="text-xs font-black uppercase tracking-widest text-foreground/30 mb-8">YOUR UNIQUE CODE</h2>
             <div className="bg-background border-2 border-dashed border-accent/30 p-6 rounded-2xl w-full text-center mb-6 relative group">
               <span className="text-2xl font-black tracking-widest text-accent">{code}</span>
-              <button 
+              <button
+                title="Copy Code"
                 onClick={copyCode}
                 className="absolute right-4 top-1/2 -translate-y-1/2 p-3 bg-muted rounded-xl hover:bg-accent hover:text-black transition-all"
               >
                 <Copy size={18} />
               </button>
             </div>
-            <button className="w-full bg-accent text-black py-4 rounded-2xl font-black uppercase tracking-widest text-xs hover:scale-105 transition-all flex items-center justify-center gap-2 shadow-lg shadow-accent/20">
+            <button onClick={shareInvite} className="w-full bg-accent text-black py-4 rounded-2xl font-black uppercase tracking-widest text-xs hover:scale-105 transition-all flex items-center justify-center gap-2 shadow-lg shadow-accent/20">
               <Share2 size={18} /> SHARE INVITE LINK
             </button>
           </section>
