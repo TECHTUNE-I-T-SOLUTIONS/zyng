@@ -3,7 +3,7 @@ import { supabase } from '@/lib/db/supabase';
 
 export async function POST(request: Request) {
   try {
-    const { content, personaId, type, mediaUrl, schoolId } = await request.json();
+    const { content, personaId, type, mediaUrl, mediaUrls, schoolId } = await request.json();
     const { data: { user } } = await supabase.auth.getUser();
 
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -16,6 +16,7 @@ export async function POST(request: Request) {
         content,
         type: type || 'regular',
         media_url: mediaUrl,
+        media_urls: mediaUrls || (mediaUrl ? [mediaUrl] : null),
         school_id: schoolId
       }])
       .select()

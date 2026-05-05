@@ -1,10 +1,13 @@
 'use client';
 
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { campusService } from '@/lib/services/campusService';
+import { zingService } from '@/lib/services/zingService';
+import Link from 'next/link';
 import { userService } from '@/lib/services/userService';
 import { motion, AnimatePresence } from 'framer-motion';
+import PasswordJoinForm from './PasswordJoinForm';
 import { 
   Users, 
   Hash, 
@@ -31,9 +34,25 @@ export default function RoomsPage() {
   const [newRoomPassword, setNewRoomPassword] = useState('');
   const [creatingRoom, setCreatingRoom] = useState(false);
 
+  const queryClient = useQueryClient();
   const { data: rooms, isLoading } = useQuery({
     queryKey: ['rooms', activeTab],
-    queryFn: () => campusService.getRooms(),
+    queryFn: () => zingService.getRooms(),
+  });
+
+  const joinMutation = useMutation({
+    mutationFn: async ({ roomId, password }: { roomId: string; password?: string | null }) => {
+      const res = await fetch('/api/rooms/join', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ roomId, password }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error || 'Failed to join');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['rooms'] });
+    }
   });
 
   return (
@@ -85,50 +104,79 @@ export default function RoomsPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {rooms.map((room, i) => (
-              <motion.div
-                key={room.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.05 }}
-                className="group cursor-pointer"
-                onClick={() => room.is_private && setShowPasswordModal(room.id)}
-              >
-                <div className="bg-muted border border-border p-8 rounded-[2.5rem] h-full flex flex-col hover:border-accent/50 transition-all shadow-xl shadow-accent/5 relative overflow-hidden">
-                  <div className="flex items-center justify-between mb-6">
-                    <div className={`p-4 rounded-2xl ${room.is_private ? 'bg-indigo-500/10 text-indigo-400' : 'bg-accent/10 text-accent'}`}>
-                      {room.is_private ? <Lock size={24} /> : <Globe size={24} />}
-                    </div>
-                    <div className="flex items-center gap-1.5 text-[9px] font-black uppercase text-foreground/40 tracking-widest">
-                       <Users size={14} /> 128
-                    </div>
-                  </div>
-                  
-                  <h3 className="text-xl font-black mb-2 tracking-tight group-hover:text-accent transition-colors">
-                    {room.name || 'Unnamed Room'}
-                  </h3>
-                  <p className="text-xs text-foreground/40 font-medium italic mb-8 line-clamp-2">
-                    {room.description || 'No description provided for this campus room.'}
-                  </p>
-                  
-                  <div className="mt-auto flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="w-6 h-6 rounded-full bg-accent/20 border border-accent/20" />
-                      <div className="text-[10px] font-bold text-foreground/30 uppercase">Unilorin</div>
-                    </div>
-                    <button title="Join Room" className="p-3 bg-background border border-border rounded-xl group-hover:bg-accent group-hover:text-black transition-all">
-                      <ChevronRight size={18} />
-                    </button>
-                  </div>
+            {rooms.map((room, i) => {
+              const memberCount = Array.isArray(room.zing_room_members) ? room.zing_room_members.length : 0;
+              const lastMessage = Array.isArray(room.zing_messages) && room.zing_messages.length > 0
+                ? [...room.zing_messages].sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0]
+                : null;
 
-                  {room.is_private && (
-                    <div className="absolute top-4 right-4 bg-indigo-500/20 text-indigo-400 text-[8px] font-black px-2 py-1 rounded-full uppercase tracking-tighter border border-indigo-500/30">
-                       Private
+              const card = (
+                <motion.div
+                  key={room.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: i * 0.05 }}
+                  className="group"
+                >
+                  <div className="bg-muted border border-border p-8 rounded-[2.5rem] h-full flex flex-col hover:border-accent/50 transition-all shadow-xl shadow-accent/5 relative overflow-hidden">
+                    <div className="flex items-center justify-between mb-6">
+                      <div className={`p-4 rounded-2xl ${room.is_private ? 'bg-indigo-500/10 text-indigo-400' : 'bg-accent/10 text-accent'}`}>
+                        {room.is_private ? <Lock size={24} /> : <Globe size={24} />}
+                      </div>
+                      <div className="flex items-center gap-1.5 text-[11px] font-black uppercase text-foreground/40 tracking-widest">
+                         <Users size={16} /> <span className="ml-1">{memberCount}</span>
+                      </div>
                     </div>
-                  )}
+                    
+                    <h3 className="text-xl font-black mb-2 tracking-tight group-hover:text-accent transition-colors">
+                      {room.name || 'Unnamed Room'}
+                    </h3>
+                    <p className="text-xs text-foreground/40 font-medium italic mb-4 line-clamp-2">
+                      {room.description || 'No description provided for this campus room.'}
+                    </p>
+
+                    {lastMessage && (
+                      <div className="text-[12px] text-foreground/50 mb-6">
+                        <span className="font-black text-foreground/70">{lastMessage.sender?.z_name || 'Someone'}:</span>{' '}
+                        <span className="italic">{lastMessage.content}</span>
+                      </div>
+                    )}
+
+                    <div className="mt-auto flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <div className="w-6 h-6 rounded-full bg-accent/20 border border-accent/20" />
+                                <div className="text-[10px] font-bold text-foreground/30 uppercase">{room.creator?.z_name || 'Creator'}</div>
+                              </div>
+                      <div>
+                        {room.is_private ? (
+                          <button title="Join Room" onClick={() => setShowPasswordModal(room.id)} className="p-3 bg-background border border-border rounded-xl group-hover:bg-accent group-hover:text-black transition-all">
+                            <Key size={18} />
+                          </button>
+                        ) : (
+                          <Link href={`/z-rooms/${room.id}`} className="p-3 bg-background border border-border rounded-xl group-hover:bg-accent group-hover:text-black transition-all inline-flex items-center">
+                            <ChevronRight size={18} />
+                          </Link>
+                        )}
+                      </div>
+                    </div>
+
+                        {room.is_private && (
+                         <div className="absolute top-4 right-4 bg-indigo-500/20 text-indigo-400 text-[8px] font-black px-2 py-1 rounded-full uppercase tracking-tighter border border-indigo-500/30">
+                           Private
+                         </div>
+                        )}
+                  </div>
+                </motion.div>
+              );
+
+              return room.is_private ? (
+                <div key={room.id} className="cursor-pointer" onClick={() => setShowPasswordModal(room.id)}>
+                  {card}
                 </div>
-              </motion.div>
-            ))}
+              ) : (
+                <div key={room.id} className="cursor-pointer">{card}</div>
+              );
+            })}
           </div>
         )}
       </div>
@@ -151,21 +199,20 @@ export default function RoomsPage() {
               className="relative w-full max-w-sm bg-background border border-border p-8 rounded-[2.5rem] text-center shadow-2xl"
             >
               <div className="w-16 h-16 bg-indigo-500/10 text-indigo-400 rounded-2xl flex items-center justify-center mx-auto mb-6">
-                <Key size={32} />
-              </div>
+                  <Key size={32} />
+                </div>
               <h2 className="text-2xl font-black text-foreground mb-2 tracking-tight uppercase">Enter Room Password</h2>
               <p className="text-foreground/40 text-xs font-medium italic mb-8">This is a private space. You need the access code shared by the room owner.</p>
               
-              <div className="space-y-4">
-                <input 
-                  type="password" 
-                  placeholder="Access Code" 
-                  className="w-full bg-muted border border-border rounded-2xl py-4 px-6 text-center text-lg font-black tracking-widest focus:outline-none focus:border-indigo-500 transition-all"
+                <PasswordJoinForm
+                  roomId={showPasswordModal!}
+                  onClose={() => setShowPasswordModal(null)}
+                  onJoined={() => {
+                    setShowPasswordModal(null);
+                    queryClient.invalidateQueries(['rooms']);
+                  }}
+                  joinMutation={joinMutation}
                 />
-                <button className="w-full bg-indigo-500 text-white py-4 rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-indigo-600 transition-all shadow-lg shadow-indigo-500/20">
-                  Join Private Room
-                </button>
-              </div>
             </motion.div>
           </div>
         )}
@@ -236,7 +283,7 @@ export default function RoomsPage() {
                     });
                     setShowCreateModal(false);
                     // Ideally refresh rooms query; simple reload for now
-                    window.location.reload();
+                    queryClient.invalidateQueries(['rooms']);
                   } catch (err) {
                     console.error(err);
                     alert('Failed to create room.');

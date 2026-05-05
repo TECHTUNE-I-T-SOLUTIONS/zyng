@@ -1,11 +1,13 @@
-'use client';
+ 'use client';
 
 import { useQuery } from '@tanstack/react-query';
 import { campusService } from '@/lib/services/campusService';
 import { motion } from 'framer-motion';
+import { useRouter } from 'next/navigation';
 import { Briefcase, MapPin, Building, Clock, ChevronRight, Loader2 } from 'lucide-react';
 
 export default function JobsPage() {
+  const router = useRouter();
   const { data: jobs, isLoading } = useQuery({
     queryKey: ['opportunities'],
     queryFn: () => campusService.getOpportunities(),
@@ -34,28 +36,36 @@ export default function JobsPage() {
                 key={job.id}
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.1 }}
-                whileHover={{ x: 10 }}
+                transition={{ delay: i * 0.05 }}
+                whileHover={{ x: 6 }}
+                onClick={() => router.push(`/z-jobs/${job.id}`)}
                 className="bg-muted border border-border p-6 rounded-[2rem] flex items-center gap-6 group cursor-pointer hover:border-accent/30 transition-all"
               >
                 <div className="w-16 h-16 rounded-2xl bg-background border border-border flex items-center justify-center text-accent group-hover:scale-110 transition-transform">
                   <Briefcase size={28} />
                 </div>
-                
+
                 <div className="flex-1">
                   <h3 className="text-xl font-bold mb-1">{job.title}</h3>
                   <div className="flex flex-wrap items-center gap-4 text-xs font-bold text-foreground/40 uppercase tracking-tight">
                     <div className="flex items-center gap-1"><Building size={14} /> {job.company || 'Private Poster'}</div>
                     <div className="flex items-center gap-1"><MapPin size={14} /> {job.type}</div>
                     <div className="flex items-center gap-1">
-                      <Clock size={14} /> 
-                      {job.deadline ? `Deadline: ${new Date(job.deadline).toLocaleDateString()}` : 'No deadline'}
+                      <Clock size={14} />
+                      {job.apply_deadline ? `Deadline: ${new Date(job.apply_deadline).toLocaleDateString()}` : 'No deadline'}
                     </div>
                   </div>
+                  {Array.isArray(job.skills_required) && job.skills_required.length > 0 && (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {job.skills_required.map((s: string) => (
+                        <div key={s} className="px-3 py-1 rounded-full bg-background/60 text-[12px] font-bold border border-border">{s}</div>
+                      ))}
+                    </div>
+                  )}
                 </div>
-                
+
                 <div className="text-right">
-                  <button className="p-3 bg-background border border-border rounded-xl group-hover:bg-accent group-hover:text-black transition-all">
+                  <button onClick={(e) => { e.stopPropagation(); router.push(`/z-jobs/${job.id}`); }} className="p-3 bg-background border border-border rounded-xl group-hover:bg-accent group-hover:text-black transition-all">
                     <ChevronRight size={20} />
                   </button>
                 </div>

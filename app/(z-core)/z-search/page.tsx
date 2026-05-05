@@ -38,13 +38,23 @@ export default function SearchPage() {
 
       // Posts search
       const postsQuery = async () => {
-        const { data, error } = await supabase
-          .from('posts')
-          .select('*, persona:personas(*)')
-          .ilike('content', `%${query}%`)
-          .limit(12);
-        if (error) throw error;
-        return data || [];
+        const tag = query.replace(/^#/, '').toLowerCase();
+        const byContent = supabase.from('posts').select('*, persona:personas(*)').ilike('content', `%${query}%`).limit(12);
+
+        // exact array match (case sensitive on array values)
+        const byHashtagExact = supabase.from('posts').select('*, persona:personas(*)').contains('hashtags', [tag]).limit(12);
+
+        // fuzzy match: cast hashtags to text and ilike for case-insensitive matching
+        const byHashtagFuzzy = supabase.from('posts').select('*, persona:personas(*)').ilike('hashtags', `%${tag}%`).limit(12);
+
+        const [res1, res2, res3] = await Promise.all([byContent, byHashtagExact, byHashtagFuzzy]);
+        if ((res1 && res1.error) || (res2 && res2.error) || (res3 && res3.error)) throw (res1.error || res2.error || res3.error);
+        const list1 = res1?.data || [];
+        const list2 = res2?.data || [];
+        const list3 = res3?.data || [];
+        const map = new Map();
+        [...list1, ...list2, ...list3].forEach((p: any) => map.set(p.id, p));
+        return Array.from(map.values()).slice(0, 12);
       };
 
       if (activeTab === 'People') {
@@ -156,6 +166,13 @@ export default function SearchPage() {
                         <span className="text-[10px] text-foreground/30 font-black uppercase tracking-tighter">{new Date(post.created_at).toLocaleDateString()}</span>
                       </div>
                       <p className="text-sm font-medium">{post.content}</p>
+                      {post.hashtags && post.hashtags.length > 0 && (
+                        <div className="mt-3 flex gap-2">
+                          {post.hashtags.map((h: string) => (
+                            <Link key={h} href={`/z-search?q=${encodeURIComponent(h)}`} className="text-accent text-xs font-black">#{h}</Link>
+                          ))}
+                        </div>
+                      )}
                     </Link>
                   ))}
                 </div>

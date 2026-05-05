@@ -73,6 +73,9 @@ export interface Post {
   type: 'regular' | 'confession' | 'poll' | 'hot_take' | 'missed_connection' | 'trend' | 'pulse';
   content: string;
   media_url?: string;
+  media_urls?: string[];
+  hashtags?: string[];
+  hashtag?: string | null;
   school_id?: string;
   poll_options?: any;
   expires_at?: string;

@@ -20,18 +20,45 @@ import {
   Gift
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { useToast } from '@/components/toast';
 import { cn } from '@/lib/utils';
 import { userService } from '@/lib/services/userService';
 import { ThemeToggle } from '@/components/theme-toggle';
+import { useEffect } from 'react';
 
 export default function ZLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
-  const { data: user } = useQuery({ queryKey: ['z-layout-me'], queryFn: () => userService.getCurrentUser() });
+  // removed debug UI state
+  const { data: user } = useQuery({ 
+    queryKey: ['z-layout-me'], 
+    queryFn: () => userService.getCurrentUser() 
+  });
 
-  const { data: trends } = useQuery({ queryKey: ['trending_hashtags'], queryFn: () => trendsService.getTrendingHashtags(), initialData: [] });
-  const { data: mood } = useQuery({ queryKey: ['platform_mood'], queryFn: () => trendsService.getPlatformMood(), initialData: null });
+  const { data: trends, error: trendsError, isLoading } = useQuery({ queryKey: ['trending_hashtags'], queryFn: () => trendsService.getTrendingHashtags(), staleTime: 0, refetchOnMount: true });
+  const { data: mood, error: moodError } = useQuery<any>({ queryKey: ['platform_mood'], queryFn: () => trendsService.getPlatformMood(), initialData: null });
+  const [trendsLocal, setTrendsLocal] = useState<any[] | null>(null);
+
+  const toast = useToast();
+
+  if (trendsError) console.error('[ZLayout] trends query error', trendsError);
+  if (moodError) console.error('[ZLayout] mood query error', moodError);
+  if (Array.isArray(trends) && trends.length > 0) console.debug('[ZLayout] trends (client) count', trends.length, trends.slice(0,5));
+
+  // also fetch directly into local state to ensure UI updates
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const r = await trendsService.getTrendingHashtags(10);
+        if (mounted) setTrendsLocal(Array.isArray(r) ? r : []);
+      } catch (err) {
+        if (mounted) setTrendsLocal([]);
+      }
+    })();
+    return () => { mounted = false; };
+  }, []);
 
   const shareInvite = async () => {
     const code = user?.referral_code || 'ZYNG-USER-XXXX';
@@ -41,17 +68,17 @@ export default function ZLayout({ children }: { children: React.ReactNode }) {
         await (navigator as any).share({ title: 'Join Zyng', text: 'Join Zyng with my referral code', url });
       } else {
         await navigator.clipboard.writeText(url);
-        alert('Invite link copied to clipboard');
+        toast.show('Invite link copied to clipboard', 'success');
       }
     } catch (err) {
-      console.error(err);
-      try { await navigator.clipboard.writeText(url); alert('Invite link copied to clipboard'); } catch {}
+      const [showDebug, setShowDebug] = useState(false); // Debug UI state
+      try { await navigator.clipboard.writeText(url); toast.show('Invite link copied to clipboard', 'success'); } catch {}
     }
   };
 
   // Main bottom nav
   const navItems = [
-    { name: 'Zynging', href: '/z-feed', icon: Rss },
+    { name: 'Feed', href: '/z-feed', icon: Rss },
     { name: 'Pro Hub', href: '/z-pro', icon: Briefcase },
     { name: 'Rooms', href: '/z-rooms', icon: MessageSquare },
     { name: 'Events', href: '/z-events', icon: TrendingUp },
@@ -214,18 +241,19 @@ export default function ZLayout({ children }: { children: React.ReactNode }) {
             <TrendingUp size={12} /> Campus Trends
           </h2>
           <div className="space-y-4">
-            {(trends || []).length > 0 ? (
-              trends.map((t: any) => (
+            {(() => {
+              const display = trendsLocal ?? trends ?? [];
+              if (display.length > 0) return display.map((t: any) => (
                 <div key={t.hashtag} className="group cursor-pointer">
                   <div className="text-sm font-bold group-hover:text-accent transition-colors">{t.hashtag}</div>
                   <div className="text-[10px] text-foreground/40">{t.usage_count} Zyngs</div>
                 </div>
-              ))
-            ) : (
-              <div className="text-sm text-foreground/40">No trending hashtags yet.</div>
-            )}
+              ));
+              return <div className="text-sm text-foreground/40">{isLoading && !trendsLocal ? 'Loading trends...' : 'No trending hashtags yet.'}</div>;
+            })()}
           </div>
         </section>
+        {/* debug UI removed */}
 
         <section className="mb-8">
           <h2 className="text-[11px] font-black uppercase tracking-widest text-foreground/30 mb-4">Live Pulse</h2>

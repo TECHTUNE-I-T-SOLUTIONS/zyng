@@ -64,26 +64,66 @@ export async function POST(request: Request) {
     if (!cloudName || !apiKey || !apiSecret) return NextResponse.json({ error: 'Cloudinary not configured' }, { status: 500 });
 
     const timestamp = Math.floor(Date.now() / 1000);
-    // include resource_type in signature when present
-    const toSign = `timestamp=${timestamp}` + (rType ? `&resource_type=${rType}` : '');
+
+    // Prepare public_id (sanitize and strip extension)
+    let publicId: string | undefined;
+    if (filename) {
+      publicId = filename.replace(/[^a-zA-Z0-9_\-\.]/g, '_').replace(/\.[^.]+$/, '');
+    }
+
+    // Build signing params and sort keys as required by Cloudinary.
+    // Note: the upload path already encodes the resource type (e.g. /image/upload),
+    // so we must NOT include `resource_type` in the signed string. Including it
+    // previously caused signature mismatches for image uploads.
+    const signParams: Record<string, string> = { timestamp: String(timestamp) };
+    if (publicId) signParams.public_id = publicId;
+
+    const toSign = Object.keys(signParams)
+      .sort()
+      .map((k) => `${k}=${signParams[k]}`)
+      .join('&');
+
     const signature = crypto.createHash('sha1').update(toSign + apiSecret).digest('hex');
 
     const url = `https://api.cloudinary.com/v1_1/${cloudName}/${rType}/upload`;
 
-    const params = new URLSearchParams();
-    params.append('file', dataUrl);
-    if (filename) params.append('public_id', filename.replace(/[^a-zA-Z0-9_\-\.]/g, '_'));
-    params.append('api_key', apiKey);
-    params.append('timestamp', String(timestamp));
-    params.append('signature', signature);
-    if (rType) params.append('resource_type', rType);
+    // Use FormData for uploads — more reliable for larger payloads and
+    // avoids urlencoded size/encoding issues. Node / Next.js supports
+    // FormData in server runtime.
+    const form = new FormData();
+    // Send binary buffer rather than the data URL string — more reliable
+    // for server-side multipart uploads to Cloudinary.
+    const filenameForForm = publicId ? `${publicId}` : filename || 'file';
+    // Convert Node Buffer to a Blob with the correct MIME type so
+    // server-side FormData.append accepts it in Next.js runtime.
+    const fileBlob = new Blob([buffer], { type: mime });
+    form.append('file', fileBlob, filenameForForm);
+    if (publicId) form.append('public_id', publicId);
+    form.append('api_key', apiKey);
+    form.append('timestamp', String(timestamp));
+    form.append('signature', signature);
 
-    const res = await fetch(url, { method: 'POST', body: params });
-    const data = await res.json();
-    if (!res.ok) return NextResponse.json({ error: data }, { status: res.status });
+    // Do not set manual Content-Type; let fetch set the multipart boundary.
+    const res = await fetch(url, { method: 'POST', body: form });
+
+    // Try to parse JSON, but fall back to text for unexpected responses
+    let data: any;
+    try {
+      data = await res.json();
+    } catch (parseErr) {
+      const text = await res.text();
+      data = { text };
+    }
+
+    if (!res.ok) {
+      // Log Cloudinary response for easier debugging during development
+      console.error('Cloudinary upload failed', { status: res.status, body: data });
+      return NextResponse.json({ error: 'Cloudinary upload failed', status: res.status, body: data }, { status: 502 });
+    }
 
     return NextResponse.json({ url: data.secure_url, raw: data });
   } catch (err: any) {
+    console.error('uploads.route error', err);
     return NextResponse.json({ error: err?.message || String(err) }, { status: 500 });
   }
 }

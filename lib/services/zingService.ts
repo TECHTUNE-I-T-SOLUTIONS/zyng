@@ -4,8 +4,28 @@ export const zingService = {
   async getRooms() {
     const { data, error } = await supabase
       .from('zing_rooms')
-      .select('*, zing_room_members(*), zing_messages(content, created_at)')
+      .select('*, zing_room_members(*), zing_messages(*), creator:users(id, z_name, avatar_url)')
       .order('created_at', { ascending: false });
+    if (error) throw error;
+    return data;
+  },
+
+  async getRoomById(id: string) {
+    const { data, error } = await supabase
+      .from('zing_rooms')
+      .select('*, zing_room_members(*, user:users(id, z_name, avatar_url)), zing_messages(*, sender:users!sender_id(id, z_name, avatar_url))')
+      .eq('id', id)
+      .maybeSingle();
+    if (error) throw error;
+    return data;
+  },
+
+  async sendMessage(roomId: string, content: string) {
+    const { data, error } = await supabase
+      .from('zing_messages')
+      .insert([{ room_id: roomId, content }])
+      .select()
+      .single();
     if (error) throw error;
     return data;
   },

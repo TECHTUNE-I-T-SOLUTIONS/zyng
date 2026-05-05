@@ -12,12 +12,14 @@ export default function ZPersonas() {
   const [newPersonaName, setNewPersonaName] = useState('');
 
   const { data: user } = useQuery({ queryKey: ['me'], queryFn: () => userService.getCurrentUser() });
-  const { data: personas, isLoading, refetch } = useQuery({
+  const { data: apiPersonas, isLoading, refetch } = useQuery({
     queryKey: ['personas', user?.id],
     queryFn: () => (user?.id ? getPersonas(user.id).then((res) => res.data || []) : Promise.resolve([])),
     enabled: !!user?.id,
   });
 
+  // prefer server API personas but fallback to `user.personas` included on the user object
+  const personas = (apiPersonas && apiPersonas.length > 0) ? apiPersonas : (user?.personas || []);
   const activePersona = personas?.find((persona: any) => persona.is_active);
 
   const handleCreatePersona = async () => {

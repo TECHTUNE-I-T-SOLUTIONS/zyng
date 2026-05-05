@@ -51,6 +51,15 @@
   }
 }
 
+/* Utility to hide scrollbars but keep scrollable */
+.hide-scrollbar {
+  -ms-overflow-style: none; /* IE and Edge */
+  scrollbar-width: none; /* Firefox */
+}
+.hide-scrollbar::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera */
+}
+
 ::view-transition-old(root),
 ::view-transition-new(root) {
   animation: none;

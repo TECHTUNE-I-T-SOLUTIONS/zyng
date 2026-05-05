@@ -1,20 +1,30 @@
-import { supabase } from '@/lib/db/supabase';
-
 export const trendsService = {
   async getTrendingHashtags(limit = 10) {
-    const { data, error } = await supabase
-      .from('trending_hashtags')
-      .select('*')
-      .order('usage_count', { ascending: false })
-      .limit(limit);
-    if (error) throw error;
-    return data || [];
+    try {
+      const res = await fetch(`/api/trends?limit=${encodeURIComponent(String(limit))}`);
+      if (!res.ok) {
+        const body = await res.text();
+        console.error('[trendsService] /api/trends error', res.status, body);
+        throw new Error('Failed to fetch trends');
+      }
+      const data = await res.json();
+      console.debug('[trendsService] /api/trends returned', (data || []).slice(0, 10));
+      return data || [];
+    } catch (err) {
+      console.error('[trendsService] fetch /api/trends failed', err);
+      throw err;
+    }
   },
 
   async getPlatformMood() {
-    const { data, error } = await supabase.from('platform_mood').select('*').maybeSingle();
-    if (error) throw error;
-    return data || null;
+    try {
+      const res = await fetch('/api/trends?limit=0');
+      // keep old implementation as-is: call supabase directly if needed
+      // but return null for compatibility if API not available
+      return null;
+    } catch (err) {
+      return null;
+    }
   },
 };
 

@@ -60,11 +60,25 @@ export default function LoginPage() {
       if (lookupError) throw lookupError;
       if (!userRecord?.email) throw new Error('No account email found for that phone number.');
 
-      const { error: authError } = await supabase.auth.signInWithPassword({
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
         email: userRecord.email,
         password,
       });
       if (authError) throw authError;
+
+      // Mint server cookie for routes that rely on sb-access-token
+      try {
+        const uid = authData?.user?.id;
+        if (uid) {
+          await fetch('/api/auth/token', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId: uid }),
+          });
+        }
+      } catch (err) {
+        console.warn('failed to mint server auth cookie', err);
+      }
 
       router.push(userRecord.status === 'alumni' ? '/z-alumni/dashboard' : '/z-feed');
     } catch (err: any) {
