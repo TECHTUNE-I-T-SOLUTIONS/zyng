@@ -209,7 +209,7 @@ export default function RoomsPage() {
                   onClose={() => setShowPasswordModal(null)}
                   onJoined={() => {
                     setShowPasswordModal(null);
-                    queryClient.invalidateQueries(['rooms']);
+                    queryClient.invalidateQueries({ queryKey: ['rooms'] });
                   }}
                   joinMutation={joinMutation}
                 />
@@ -283,7 +283,7 @@ export default function RoomsPage() {
                     });
                     setShowCreateModal(false);
                     // Ideally refresh rooms query; simple reload for now
-                    queryClient.invalidateQueries(['rooms']);
+                    queryClient.invalidateQueries({ queryKey: ['rooms'] });
                   } catch (err) {
                     console.error(err);
                     alert('Failed to create room.');

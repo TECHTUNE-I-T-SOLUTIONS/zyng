@@ -1,6 +1,6 @@
 import React from 'react';
 import ApplyForm from './ApplyForm';
-import campusServiceAdmin from '@/lib/services/campusService.server';
+import { campusServiceAdmin } from '@/lib/services/campusService.server';
 
 export default async function ApplyPage({ params }: { params: { id: string } }) {
   const id = params.id;

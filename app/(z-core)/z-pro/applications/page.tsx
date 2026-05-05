@@ -1,10 +1,11 @@
 import { headers } from 'next/headers';
+export const dynamic = 'force-dynamic';
 import { jwtVerify } from 'jose';
 import { applicationServiceAdmin } from '@/lib/services/applicationService.server';
 
 export default async function PosterApplicationsPage() {
   try {
-    const hd = headers();
+    const hd = await headers();
     const cookie = hd.get('cookie') || '';
     const match = cookie.match(/sb-access-token=([^;]+)/);
     if (!match) return <div className="p-6">Not authenticated</div>;

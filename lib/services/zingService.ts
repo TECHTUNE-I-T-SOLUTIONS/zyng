@@ -4,7 +4,7 @@ export const zingService = {
   async getRooms() {
     const { data, error } = await supabase
       .from('zing_rooms')
-      .select('*, zing_room_members(*), zing_messages(*), creator:users(id, z_name, avatar_url)')
+      .select('*, zing_room_members(*, user:users!user_id(id, z_name, avatar_url)), zing_messages(*, sender:users!sender_id(id, z_name, avatar_url)), creator:created_by(id, z_name, avatar_url)')
       .order('created_at', { ascending: false });
     if (error) throw error;
     return data;
@@ -13,7 +13,7 @@ export const zingService = {
   async getRoomById(id: string) {
     const { data, error } = await supabase
       .from('zing_rooms')
-      .select('*, zing_room_members(*, user:users(id, z_name, avatar_url)), zing_messages(*, sender:users!sender_id(id, z_name, avatar_url))')
+      .select('*, zing_room_members(*, user:users!user_id(id, z_name, avatar_url)), zing_messages(*, sender:users!sender_id(id, z_name, avatar_url)), creator:created_by(id, z_name, avatar_url)')
       .eq('id', id)
       .maybeSingle();
     if (error) throw error;

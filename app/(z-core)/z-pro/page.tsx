@@ -13,7 +13,6 @@ export default function ProfessionalHub() {
 
         {/* Server-rendered Manage section (hidden by client until toggled) */}
         <div id="manage-section" style={{ display: 'none' }}>
-          {/* @ts-expect-error Async Server Component */}
           <ManageJobsServer />
         </div>
       </div>

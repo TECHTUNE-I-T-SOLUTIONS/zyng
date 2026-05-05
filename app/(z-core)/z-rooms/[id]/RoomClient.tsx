@@ -54,7 +54,7 @@ export default function RoomClient({ roomId }: { roomId: string }) {
 
       <footer className="mt-4 flex gap-2">
         <input value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Write a message" className="flex-1 px-4 py-2 rounded-lg border border-border" />
-        <button onClick={() => sendMutation.mutate(message)} disabled={!message || sendMutation.isLoading} className="px-4 py-2 bg-accent text-black rounded-lg font-black">Send</button>
+        <button onClick={() => sendMutation.mutate(message)} disabled={!message || (sendMutation as any).isLoading} className="px-4 py-2 bg-accent text-black rounded-lg font-black">Send</button>
       </footer>
 
       <aside className="mt-6">

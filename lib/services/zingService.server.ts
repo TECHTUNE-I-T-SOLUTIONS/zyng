@@ -5,7 +5,7 @@ export const zingServiceServer = {
   async joinRoom({ roomId, userId, password }: { roomId: string; userId: string; password?: string | null }) {
     const { data: room, error: roomError } = await supabaseAdmin
       .from('zing_rooms')
-      .select('id, is_private, password')
+      .select('id, is_private, password_hash')
       .eq('id', roomId)
       .maybeSingle();
 

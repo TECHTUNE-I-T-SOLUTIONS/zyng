@@ -88,7 +88,7 @@ export const postService = {
   async reactToPost(postId: string, userId: string, type: string) {
     const { data, error } = await supabase
       .from('reactions')
-      .upsert({ post_id: postId, user_id: userId, type }, { onConflict: ['user_id', 'post_id'] })
+      .upsert({ post_id: postId, user_id: userId, type }, { onConflict: 'user_id,post_id' })
       .select();
 
     if (error) throw error;

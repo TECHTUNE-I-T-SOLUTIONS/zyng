@@ -18,12 +18,12 @@ async function getUserIdFromCookie(request: Request) {
   }
 }
 
-export async function PATCH(request: Request, { params }: { params: { id: string } }) {
+export async function PATCH(request: Request, context: any) {
   try {
     const userId = await getUserIdFromCookie(request);
     if (!userId) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
-
-    const id = params.id;
+    const paramsObj = await (context?.params ?? {});
+    const id = paramsObj?.id;
     const body = await request.json();
 
     // verify poster
@@ -40,12 +40,12 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   }
 }
 
-export async function DELETE(request: Request, { params }: { params: { id: string } }) {
+export async function DELETE(request: Request, context: any) {
   try {
     const userId = await getUserIdFromCookie(request);
     if (!userId) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
-
-    const id = params.id;
+    const paramsObj = await (context?.params ?? {});
+    const id = paramsObj?.id;
     const { data: opp, error: oppErr } = await supabaseAdmin.from('opportunities').select('id, posted_by').eq('id', id).single();
     if (oppErr) return NextResponse.json({ error: 'Opportunity not found' }, { status: 404 });
     if (opp.posted_by !== userId) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
@@ -59,9 +59,10 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
   }
 }
 
-export async function GET(request: Request, { params }: { params: { id: string } }) {
+export async function GET(request: Request, context: any) {
   try {
-    const id = params.id;
+    const paramsObj = await (context?.params ?? {});
+    const id = paramsObj?.id;
     const { data, error } = await supabaseAdmin.from('opportunities').select('*').eq('id', id).single();
     if (error) return NextResponse.json({ error: 'Not found' }, { status: 404 });
     return NextResponse.json(data);

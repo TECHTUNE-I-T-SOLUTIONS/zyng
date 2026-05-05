@@ -131,7 +131,7 @@ function PostCard({ post, index }: { post: Post; index: number }) {
     { key: 'boo', emoji: '😡', emojiUrl: 'https://www.emojiall.com/images/animations/joypixels/64px/face_with_steam_from_nose.gif' },
   ];
 
-  const userReaction = (post.reactions || []).find((r:any) => r.user_id === me?.id);
+  const userReaction = ((post as any).reactions || []).find((r:any) => r.user_id === me?.id);
   const [showPicker, setShowPicker] = useState(false);
   const hoverTimer = useRef<number | null>(null);
   const hideTimer = useRef<number | null>(null);
@@ -313,7 +313,7 @@ function PostCard({ post, index }: { post: Post; index: number }) {
                 {/* aggregated counts: show small badges for each reaction type with count > 0 */}
                 <div className="flex items-center gap-1">
                   {reactionTypes.map((t) => {
-                    const cnt = (post.reactions || []).filter((r:any) => r.type === t.key).length;
+                    const cnt = ((post as any).reactions || []).filter((r:any) => r.type === t.key).length;
                     return cnt > 0 ? (
                       <div key={t.key} className="inline-flex items-center gap-1 bg-muted/30 px-2 py-1 rounded-full text-[11px]">
                         <img src={t.emojiUrl} alt={t.key} className="w-4 h-4" />

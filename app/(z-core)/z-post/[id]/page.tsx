@@ -40,13 +40,13 @@ export default function PostPage() {
 
   const handleSubmitReply = async () => {
     if (!commentText.trim()) return;
-    const personaId = me?.personas?.[0]?.id || post.persona?.id || null;
+    const personaId = me?.personas?.[0]?.id || (post as any).persona?.id || null;
     if (!personaId) { toast.show('No persona available', 'error'); return; }
     setSubmitting(true);
     try {
-      await postService.createReply(post.id, personaId, commentText.trim());
+      await postService.createReply((post as any).id, personaId, commentText.trim());
       setCommentText('');
-      qc.invalidateQueries({ queryKey: ['post', post.id] });
+      qc.invalidateQueries({ queryKey: ['post', (post as any).id] });
       qc.invalidateQueries({ queryKey: ['posts'] });
       setShowComments(true);
       toast.show('Reply posted', 'success');
@@ -111,7 +111,7 @@ export default function PostPage() {
                 <div className="absolute right-0 mt-2 bg-background border border-border rounded-xl p-2 w-40 shadow-lg">
                   {me?.id === post.user_id && (
                     <>
-                          <button onClick={() => { setMenuOpen(false); router.push(`/z-profile?editPostId=${post.id}`); }} className="w-full text-left py-2 px-2 hover:bg-muted rounded">Edit</button>
+                          <button onClick={() => { setMenuOpen(false); router.push(`/z-profile?editPostId=${(post as any).id}`); }} className="w-full text-left py-2 px-2 hover:bg-muted rounded">Edit</button>
                           <button onClick={() => { setMenuOpen(false); setShowDeleteModal(true); }} className="w-full text-left py-2 px-2 hover:bg-red-50 text-red-500 rounded">Delete</button>
                     </>
                   )}
@@ -135,14 +135,14 @@ export default function PostPage() {
 
           <div className="flex items-center gap-6 text-foreground/40 border-t border-border/50 pt-6 relative">
             {(() => {
-              const userReaction = (post.reactions || []).find((r:any) => r.user_id === me?.id);
-              const prevPost = qc.getQueryData(['post', post.id]);
+              const userReaction = ((post as any).reactions || []).find((r:any) => r.user_id === me?.id);
+              const prevPost = qc.getQueryData(['post', (post as any).id]);
               const prevPosts = qc.getQueryData(['posts']);
               const userId = me?.id;
               const applyOptimistic = (type: string) => {
                 if (prevPosts) {
                   qc.setQueryData(['posts'], (prevPosts as any[]).map((p) => {
-                    if (p.id !== post.id) return p;
+                    if (p.id !== (post as any).id) return p;
                     const reactions = Array.isArray(p.reactions) ? [...p.reactions] : [];
                     const existing = reactions.find((r:any) => r.user_id === userId);
                     if (existing) {
@@ -164,7 +164,7 @@ export default function PostPage() {
                       if (idx >= 0) reactions.splice(idx, 1);
                     } else { existing.type = type; }
                   } else { reactions.push({ user_id: userId, type }); }
-                  qc.setQueryData(['post', post.id], { ...p, reactions });
+                  qc.setQueryData(['post', (post as any).id], { ...p, reactions });
                 }
               };
 
@@ -172,12 +172,12 @@ export default function PostPage() {
                 if (!me?.id) { toast.show('Login to react', 'info'); router.push('/in/login'); return; }
                 try {
                   applyOptimistic(type);
-                  await reactService({ post_id: post.id, type }, me?.id);
-                  qc.invalidateQueries({ queryKey: ['post', post.id] });
+                  await reactService({ post_id: (post as any).id, type }, me?.id);
+                  qc.invalidateQueries({ queryKey: ['post', (post as any).id] });
                   qc.invalidateQueries({ queryKey: ['posts'] });
                 } catch (err) {
                   console.error('react failed', err);
-                  qc.setQueryData(['post', post.id], prevPost);
+                  qc.setQueryData(['post', (post as any).id], prevPost);
                   qc.setQueryData(['posts'], prevPosts);
                 }
               };
@@ -204,7 +204,7 @@ export default function PostPage() {
                     </div>
                     <div className="flex items-center gap-1">
                       {reactionTypes.map((t) => {
-                        const cnt = (post.reactions || []).filter((r:any) => r.type === t.key).length;
+                        const cnt = (((post as any).reactions || []).filter((r:any) => r.type === t.key).length);
                         return cnt > 0 ? (
                           <div key={t.key} className="inline-flex items-center gap-1 bg-muted/30 px-2 py-1 rounded-full text-[11px]">
                             <img src={t.emojiUrl} alt={t.key} className="w-4 h-4" />
@@ -287,7 +287,7 @@ export default function PostPage() {
                 <p className="text-foreground/40 mb-6">Are you sure you want to permanently delete this post? This action cannot be undone.</p>
                 <div className="flex gap-3 justify-end">
                   <button onClick={() => setShowDeleteModal(false)} className="px-4 py-2 rounded-xl bg-muted">Cancel</button>
-                  <button onClick={async () => { try { await postService.deletePost(post.id); qc.invalidateQueries({ queryKey: ['posts'] }); toast.show('Post deleted', 'success'); router.push('/z-feed'); } catch (err) { console.error(err); toast.show('Delete failed', 'error'); } }} className="px-4 py-2 rounded-xl bg-red-500 text-white">Delete</button>
+                  <button onClick={async () => { try { await postService.deletePost((post as any).id); qc.invalidateQueries({ queryKey: ['posts'] }); toast.show('Post deleted', 'success'); router.push('/z-feed'); } catch (err) { console.error(err); toast.show('Delete failed', 'error'); } }} className="px-4 py-2 rounded-xl bg-red-500 text-white">Delete</button>
                 </div>
               </motion.div>
             </div>
