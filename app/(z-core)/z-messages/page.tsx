@@ -1,43 +1,130 @@
 'use client';
 
-import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useState, useEffect, useRef } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/db/supabase';
 import { zingService } from '@/lib/services/zingService';
-import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Search, 
   Send, 
   MoreVertical, 
-  ShieldCheck, 
   MessageCircle, 
-  UserPlus, 
   Check, 
   X,
   Loader2
 } from 'lucide-react';
+import { userService } from '@/lib/services/userService';
 
 export default function ZingMessagesPage() {
   const [activeTab, setActiveTab] = useState<'chats' | 'requests'>('chats');
   const [selectedChat, setSelectedChat] = useState<any>(null);
+  const [message, setMessage] = useState('');
+  const queryClient = useQueryClient();
+  const endRef = useRef<HTMLDivElement | null>(null);
+
+  const { data: user } = useQuery({ queryKey: ['me'], queryFn: () => userService.getCurrentUser() });
 
   const { data: chats, isLoading, refetch } = useQuery({
-    queryKey: ['zing-chats', activeTab],
+    queryKey: ['zing-chats', activeTab, user?.id],
+    enabled: !!user?.id,
     queryFn: async () => {
       const isAccepted = activeTab === 'chats';
       const { data, error } = await supabase
         .from('zing_chats')
-        .select('*, receiver:users!receiver_id(z_name), sender:users!sender_id(z_name)')
+        .select('*, receiver:users!receiver_id(id, z_name), sender:users!sender_id(id, z_name)')
         .eq('is_accepted', isAccepted)
+        .or(`sender_id.eq.${user?.id},receiver_id.eq.${user?.id}`)
         .order('created_at', { ascending: false });
       if (error) throw error;
       return data;
     }
   });
 
+  const { data: messages, isLoading: loadingMessages } = useQuery({
+    queryKey: ['zing-messages', selectedChat?.id],
+    enabled: !!selectedChat?.id,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('zing_messages')
+        .select('*, sender:users!sender_id(id, z_name)')
+        .eq('chat_id', selectedChat.id)
+        .order('created_at', { ascending: true });
+      if (error) throw error;
+      return data;
+    }
+  });
+
+  const sendMutation = useMutation({
+    mutationFn: async (content: string) => {
+      const { data, error } = await supabase
+        .from('zing_messages')
+        .insert([{ chat_id: selectedChat.id, sender_id: user?.id, content }])
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      setMessage('');
+    }
+  });
+
   const handleAccept = async (chatId: string) => {
     await zingService.acceptZingRequest(chatId);
-    refetch();
+    queryClient.invalidateQueries({ queryKey: ['zing-chats'] });
+    setSelectedChat((prev: any) => ({ ...prev, is_accepted: true }));
+    setActiveTab('chats');
+  };
+
+  useEffect(() => {
+    endRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  useEffect(() => {
+    if (!selectedChat?.id) return;
+    const channel = supabase
+      .channel(`chat_${selectedChat.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'zing_messages',
+          filter: `chat_id=eq.${selectedChat.id}`
+        },
+        (payload) => {
+          queryClient.invalidateQueries({ queryKey: ['zing-messages', selectedChat.id] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [selectedChat?.id, queryClient]);
+
+  // For global chat updates (new requests/chats)
+  useEffect(() => {
+    if (!user?.id) return;
+    const channel = supabase
+      .channel(`chats_updates_${user.id}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'zing_chats', filter: `receiver_id=eq.${user.id}` },
+        () => queryClient.invalidateQueries({ queryKey: ['zing-chats'] })
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'zing_chats', filter: `sender_id=eq.${user.id}` },
+        () => queryClient.invalidateQueries({ queryKey: ['zing-chats'] })
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [user?.id, queryClient]);
+
+  const getOtherUser = (chat: any) => {
+    if (chat.sender_id === user?.id) return chat.receiver;
+    return chat.sender;
   };
 
   return (
@@ -49,7 +136,7 @@ export default function ZingMessagesPage() {
           
           <div className="flex bg-muted rounded-2xl p-1 mb-6">
             <button 
-              onClick={() => setActiveTab('chats')}
+              onClick={() => { setActiveTab('chats'); setSelectedChat(null); }}
               className={`flex-1 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
                 activeTab === 'chats' ? 'bg-background text-accent shadow-sm' : 'text-foreground/40'
               }`}
@@ -57,13 +144,12 @@ export default function ZingMessagesPage() {
               Chats
             </button>
             <button 
-              onClick={() => setActiveTab('requests')}
+              onClick={() => { setActiveTab('requests'); setSelectedChat(null); }}
               className={`flex-1 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all relative ${
                 activeTab === 'requests' ? 'bg-background text-accent shadow-sm' : 'text-foreground/40'
               }`}
             >
               Requests
-              <div className="absolute -top-1 -right-1 w-4 h-4 bg-accent text-black flex items-center justify-center rounded-full text-[8px]">2</div>
             </button>
           </div>
 
@@ -86,42 +172,46 @@ export default function ZingMessagesPage() {
               <p className="text-[10px] font-black uppercase text-foreground/30 tracking-widest">No active {activeTab}</p>
             </div>
           ) : (
-            chats?.map((chat: any) => (
-              <div 
-                key={chat.id} 
-                onClick={() => setSelectedChat(chat)}
-                className={`p-4 flex items-center gap-4 cursor-pointer transition-all border-b border-border/50 hover:bg-muted/50 ${selectedChat?.id === chat.id ? 'bg-muted border-l-4 border-l-accent' : ''}`}
-              >
-                <div className="w-12 h-12 rounded-full bg-accent/10 border border-accent/20 flex items-center justify-center font-bold text-accent">
-                   {chat.receiver?.z_name?.[0]?.toUpperCase()}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between mb-0.5">
-                    <span className="font-bold text-sm truncate uppercase tracking-tight">@{chat.receiver?.z_name}</span>
-                    <span className="text-[9px] text-foreground/30 font-bold">12:45</span>
+            chats?.map((chat: any) => {
+              const otherUser = getOtherUser(chat);
+              return (
+                <div 
+                  key={chat.id} 
+                  onClick={() => setSelectedChat(chat)}
+                  className={`p-4 flex items-center gap-4 cursor-pointer transition-all border-b border-border/50 hover:bg-muted/50 ${selectedChat?.id === chat.id ? 'bg-muted border-l-4 border-l-accent' : ''}`}
+                >
+                  <div className="w-12 h-12 rounded-full bg-accent/10 border border-accent/20 flex items-center justify-center font-bold text-accent">
+                     {otherUser?.z_name?.[0]?.toUpperCase() || '?'}
                   </div>
-                  <p className="text-xs text-foreground/40 truncate italic">Swipe to see more...</p>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between mb-0.5">
+                      <span className="font-bold text-sm truncate uppercase tracking-tight">@{otherUser?.z_name || 'Anonymous'}</span>
+                    </div>
+                    <p className="text-xs text-foreground/40 truncate italic">Click to view messages...</p>
+                  </div>
                 </div>
-              </div>
-            ))
+              );
+            })
           )}
         </div>
       </aside>
 
       {/* Chat Area */}
-      <main className="flex-1 flex flex-col bg-[radial-gradient(circle_at_bottom_left,rgba(var(--accent-rgb),0.03),transparent_50%)]">
+      <main className="flex-1 flex flex-col bg-[radial-gradient(circle_at_bottom_left,rgba(var(--accent-rgb),0.03),transparent_50%)] relative">
         {selectedChat ? (
           <>
-            <header className="h-20 border-b border-border px-8 flex items-center justify-between bg-background/50 backdrop-blur-xl">
+            <header className="h-20 border-b border-border px-8 flex items-center justify-between bg-background/50 backdrop-blur-xl shrink-0">
               <div className="flex items-center gap-4">
                 <div className="w-10 h-10 rounded-full bg-accent/10 flex items-center justify-center font-bold text-accent">
-                  {selectedChat.receiver?.z_name?.[0].toUpperCase()}
+                  {getOtherUser(selectedChat)?.z_name?.[0]?.toUpperCase() || '?'}
                 </div>
                 <div>
-                  <h2 className="font-black text-sm uppercase tracking-widest">@{selectedChat.receiver?.z_name}</h2>
-                  <div className="flex items-center gap-1.5 text-[9px] font-black text-green-500 uppercase">
-                    <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" /> Active Now
-                  </div>
+                  <h2 className="font-black text-sm uppercase tracking-widest">@{getOtherUser(selectedChat)?.z_name || 'Anonymous'}</h2>
+                  {selectedChat.is_accepted && (
+                    <div className="flex items-center gap-1.5 text-[9px] font-black text-green-500 uppercase">
+                      <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" /> Active Now
+                    </div>
+                  )}
                 </div>
               </div>
               <button className="p-2 text-foreground/40 hover:text-foreground transition-all">
@@ -129,28 +219,51 @@ export default function ZingMessagesPage() {
               </button>
             </header>
 
-            <div className="flex-1 p-8 overflow-y-auto flex flex-col gap-6">
-              {/* Message logic here */}
-              <div className="bg-muted p-4 rounded-2xl max-w-sm self-start text-sm font-medium border border-border/50">
-                 Hey! I saw your Zyng about the engineering fair. Are you still looking for partners?
-              </div>
+            <div className="flex-1 p-8 overflow-y-auto flex flex-col gap-4">
+              {loadingMessages ? (
+                <div className="flex-1 flex items-center justify-center">
+                  <Loader2 className="animate-spin text-accent" />
+                </div>
+              ) : messages?.length === 0 ? (
+                <div className="flex-1 flex flex-col items-center justify-center text-foreground/40">
+                  <p className="text-sm font-bold">No messages yet</p>
+                </div>
+              ) : (
+                messages?.map((m: any) => {
+                  const isMe = m.sender_id === user?.id;
+                  return (
+                    <div key={m.id} className={`flex flex-col max-w-[70%] ${isMe ? 'self-end items-end' : 'self-start items-start'}`}>
+                      <div className={`p-4 rounded-2xl text-sm font-medium border ${isMe ? 'bg-accent text-black border-accent rounded-br-sm' : 'bg-muted border-border/50 rounded-bl-sm'}`}>
+                         {m.content}
+                      </div>
+                      <span className="text-[9px] text-foreground/40 mt-1">{new Date(m.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                    </div>
+                  );
+                })
+              )}
+              <div ref={endRef} />
             </div>
 
             {selectedChat.is_accepted ? (
-              <div className="p-6 border-t border-border bg-background">
-                <div className="max-w-4xl mx-auto flex gap-4">
+              <div className="p-6 border-t border-border bg-background shrink-0">
+                <form 
+                  onSubmit={(e) => { e.preventDefault(); if (message.trim()) sendMutation.mutate(message); }}
+                  className="max-w-4xl mx-auto flex gap-4"
+                >
                   <input 
                     type="text" 
+                    value={message}
+                    onChange={(e) => setMessage(e.target.value)}
                     placeholder="Type a Zing..." 
                     className="flex-1 bg-muted border border-border rounded-2xl px-6 py-4 text-sm focus:outline-none focus:border-accent transition-all"
                   />
-                  <button className="bg-accent text-black p-4 rounded-2xl shadow-lg shadow-accent/20 hover:scale-105 transition-all">
-                    <Send size={20} />
+                  <button type="submit" disabled={!message.trim() || sendMutation.isPending} className="bg-accent text-black p-4 rounded-2xl shadow-lg shadow-accent/20 hover:scale-105 transition-all disabled:opacity-50 disabled:hover:scale-100">
+                    {sendMutation.isPending ? <Loader2 size={20} className="animate-spin" /> : <Send size={20} />}
                   </button>
-                </div>
+                </form>
               </div>
-            ) : (
-              <div className="p-10 border-t border-border bg-accent/5 backdrop-blur-md text-center">
+            ) : selectedChat.receiver_id === user?.id ? (
+              <div className="p-10 border-t border-border bg-accent/5 backdrop-blur-md text-center shrink-0">
                 <h3 className="text-lg font-black uppercase tracking-tight mb-2">Message Request</h3>
                 <p className="text-xs text-foreground/40 font-medium italic mb-8 max-w-xs mx-auto">
                   @{selectedChat.sender?.z_name} wants to Zing with you. Their real identity remains hidden until you accept.
@@ -158,14 +271,18 @@ export default function ZingMessagesPage() {
                 <div className="flex items-center justify-center gap-4">
                   <button 
                     onClick={() => handleAccept(selectedChat.id)}
-                    className="bg-accent text-black px-10 py-3 rounded-2xl font-black uppercase tracking-widest text-xs flex items-center gap-2 shadow-lg shadow-accent/20"
+                    className="bg-accent text-black px-10 py-3 rounded-2xl font-black uppercase tracking-widest text-xs flex items-center gap-2 shadow-lg shadow-accent/20 hover:scale-105 transition-all"
                   >
                     <Check size={18} /> Accept
                   </button>
-                  <button className="bg-white/5 border border-border text-red-500 px-10 py-3 rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-red-500/10">
+                  <button className="bg-white/5 border border-border text-red-500 px-10 py-3 rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-red-500/10 transition-all">
                     <X size={18} /> Ignore
                   </button>
                 </div>
+              </div>
+            ) : (
+              <div className="p-6 border-t border-border bg-background text-center text-xs text-foreground/50 shrink-0 italic">
+                Waiting for @{selectedChat.receiver?.z_name} to accept your request.
               </div>
             )}
           </>

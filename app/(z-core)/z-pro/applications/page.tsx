@@ -2,6 +2,7 @@ import { headers } from 'next/headers';
 export const dynamic = 'force-dynamic';
 import { jwtVerify } from 'jose';
 import { applicationServiceAdmin } from '@/lib/services/applicationService.server';
+import { slugify } from '@/lib/utils';
 
 export default async function PosterApplicationsPage() {
   try {
@@ -35,7 +36,7 @@ export default async function PosterApplicationsPage() {
                   </div>
                   <div className="text-right">
                     <div className="text-sm font-bold">Status: {a.status}</div>
-                    <a href={`/z-jobs/${a.opportunity?.id}`} className="text-sm text-accent mt-2">View Job</a>
+                    <a href={`/z-jobs/${slugify(a.opportunity?.title || '')}`} className="text-sm text-accent mt-2">View Job</a>
                   </div>
                 </div>
                 {a.cover_letter && (

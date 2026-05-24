@@ -237,12 +237,10 @@ function PostCard({ post, index }: { post: Post; index: number }) {
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <div className="text-sm font-black text-foreground/80 italic">
+              <div className="text-sm font-black text-foreground/80 italic flex items-center gap-2">
+                <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${post.persona?.name || 'anonymous'}`} alt="avatar" className="w-6 h-6 rounded-full bg-background" />
                 {post.persona?.name || 'Anonymous Zynger'}
               </div>
-              {post.user?.z_name && (
-                <div className="text-[11px] text-foreground/40">@{post.user.z_name}</div>
-              )}
               {post.user?.status === 'alumni' && (
                 <div className="bg-indigo-500/10 text-indigo-400 text-[8px] font-black px-2 py-0.5 rounded-full border border-indigo-500/20 uppercase tracking-tighter">
                   Alumni

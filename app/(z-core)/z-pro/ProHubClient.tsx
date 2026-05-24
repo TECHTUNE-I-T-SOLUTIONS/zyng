@@ -5,6 +5,7 @@ import { Briefcase, FileText, Plus, Settings, Sparkles, ChevronRight } from 'luc
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { alumniService } from '@/lib/services/alumniService';
+import { slugify } from '@/lib/utils';
 
 export default function ProHubClient() {
   const [tab, setTab] = useState<'overview'|'manage'>('overview');
@@ -42,13 +43,13 @@ export default function ProHubClient() {
         </div>
       </header>
 
-      <div id="overview-section" style={{ display: tab==='overview' ? 'block' : 'none' }} className="mt-6">
+      <div id="overview-section" className={`mt-6 ${tab === 'overview' ? 'block' : 'hidden'}`}>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2 space-y-8">
             <section className="bg-muted border border-border p-6 rounded-[2rem]">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-sm font-black uppercase tracking-[0.2em] text-foreground/40">Your Skills</h2>
-                <button className="p-2 hover:bg-background rounded-xl transition-all"><Settings size={16} /></button>
+                <button aria-label="Settings" title="Settings" className="p-2 hover:bg-background rounded-xl transition-all"><Settings size={16} /></button>
               </div>
               <div className="flex flex-wrap gap-2">
                 {data?.user?.skills?.length ? data.user.skills.map((skill: string) => (
@@ -65,7 +66,7 @@ export default function ProHubClient() {
               <h2 className="text-sm font-black uppercase tracking-[0.2em] text-foreground/40 mb-4 px-2">Zyng Matches</h2>
               <div className="space-y-4">
                 {(data?.opportunities || []).slice(0, 3).map((opportunity: any) => (
-                  <Link key={opportunity.id} href={`/z-jobs/${opportunity.id}`} className="block">
+                  <Link key={opportunity.id} href={`/z-jobs/${slugify(opportunity.title)}`} className="block">
                     <div className="bg-muted border border-border p-4 rounded-lg flex items-center justify-between hover:border-accent/30 transition-all group">
                       <div className="flex items-center gap-4">
                         <div className="w-14 h-14 bg-background border border-border rounded-2xl flex items-center justify-center text-accent group-hover:scale-110 transition-transform">
@@ -89,23 +90,23 @@ export default function ProHubClient() {
               <div className="w-16 h-16 bg-accent rounded-2xl flex items-center justify-center mx-auto mb-4 text-black shadow-md shadow-accent/20">
                 <FileText size={32} />
               </div>
-              <h3 className="text-xl font-black mb-1 tracking-tight">AI Resume</h3>
-              <p className="text-xs text-foreground/40 font-medium mb-4 italic">Export activity & skills to a PDF resume.</p>
-              <button className="w-full bg-foreground text-background py-2 rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-accent hover:text-black transition-all">
-                Generate PDF
-              </button>
+              <h3 className="text-xl font-black mb-1 tracking-tight">Portfolio</h3>
+              <p className="text-xs text-foreground/40 font-medium mb-4 italic">Build, manage, and export your portfolio from your linked profile data.</p>
+              <Link href="/z-pro/portfolio" className="w-full inline-flex items-center justify-center rounded-2xl bg-foreground text-background py-2 font-black uppercase tracking-widest text-[10px] hover:bg-accent hover:text-black transition-all">
+                Open Portfolio
+              </Link>
             </div>
 
             <div className="bg-muted border border-border p-4 rounded-[2rem]">
-              <h4 className="text-[10px] font-black uppercase tracking-widest text-foreground/30 mb-3">OPPORTUNITY STATS</h4>
+              <h4 className="text-[10px] font-black uppercase tracking-widest text-foreground/30 mb-3">PORTFOLIO STATS</h4>
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-foreground/60">Saved Resume</span>
-                  <span className="text-sm font-black">{data?.resume ? 'Yes' : 'No'}</span>
+                  <span className="text-xs font-bold text-foreground/60">Profile linked</span>
+                  <span className="text-sm font-black">{data?.user ? 'Yes' : 'No'}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-foreground/60">Referrals</span>
-                  <span className="text-sm font-black text-accent">{data?.referrals?.length || 0}</span>
+                  <span className="text-xs font-bold text-foreground/60">Skills on profile</span>
+                  <span className="text-sm font-black text-accent">{data?.user?.skills?.length || 0}</span>
                 </div>
               </div>
             </div>

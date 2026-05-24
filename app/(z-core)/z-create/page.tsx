@@ -256,7 +256,10 @@ export default function ZCreate() {
             <div className="flex items-center gap-4 text-accent opacity-60">
               <span className="text-[10px] font-black uppercase tracking-widest flex items-center gap-2">
                 Posting as
-                <span className="p-1 bg-accent/10 rounded border border-accent/20">{user?.z_name || user?.full_name || user?.phone || 'Your identity'}</span>
+                <span className="p-1 px-2 bg-accent/10 rounded border border-accent/20 flex items-center gap-2">
+                  <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${personas?.[0]?.name || 'anonymous'}`} alt="avatar" className="w-4 h-4 rounded-full" />
+                  {personas?.[0]?.name || 'No Persona Found (Create one in Profile)'}
+                </span>
               </span>
             </div>
 

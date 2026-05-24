@@ -1,10 +1,11 @@
- 'use client';
+'use client';
 
 import { useQuery } from '@tanstack/react-query';
 import { campusService } from '@/lib/services/campusService';
 import { motion } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import { Briefcase, MapPin, Building, Clock, ChevronRight, Loader2 } from 'lucide-react';
+import { slugify } from '@/lib/utils';
 
 export default function JobsPage() {
   const router = useRouter();
@@ -38,7 +39,7 @@ export default function JobsPage() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.05 }}
                 whileHover={{ x: 6 }}
-                onClick={() => router.push(`/z-jobs/${job.id}`)}
+                onClick={() => router.push(`/z-jobs/${slugify(job.title)}`)}
                 className="bg-muted border border-border p-6 rounded-[2rem] flex items-center gap-6 group cursor-pointer hover:border-accent/30 transition-all"
               >
                 <div className="w-16 h-16 rounded-2xl bg-background border border-border flex items-center justify-center text-accent group-hover:scale-110 transition-transform">
@@ -65,7 +66,7 @@ export default function JobsPage() {
                 </div>
 
                 <div className="text-right">
-                  <button onClick={(e) => { e.stopPropagation(); router.push(`/z-jobs/${job.id}`); }} className="p-3 bg-background border border-border rounded-xl group-hover:bg-accent group-hover:text-black transition-all">
+                  <button aria-label={`Open ${job.title}`} title={`Open ${job.title}`} onClick={(e) => { e.stopPropagation(); router.push(`/z-jobs/${slugify(job.title)}`); }} className="p-3 bg-background border border-border rounded-xl group-hover:bg-accent group-hover:text-black transition-all">
                     <ChevronRight size={20} />
                   </button>
                 </div>

@@ -1,48 +1,75 @@
 'use client';
+import Image from 'next/image';
+import { X } from 'lucide-react';
+import { useState } from 'react';
 
-import React, { useState } from 'react';
+interface Attachment {
+  id?: string;
+  url?: string;
+  filename?: string;
+}
 
-export default function AttachmentViewer({ attachments }: { attachments: string[] }) {
-  const [open, setOpen] = useState(false);
-  const [active, setActive] = useState<string | null>(null);
+interface Props {
+  attachments: Attachment[];
+}
 
-  if (!attachments || attachments.length === 0) return null;
+export default function AttachmentViewer({ attachments }: Props) {
+  const [preview, setPreview] = useState<string | null>(null);
 
-  const openItem = (a: string) => {
-    setActive(a);
-    setOpen(true);
+  const normalizeAttachment = (att: Attachment | string) => {
+    if (typeof att === 'string') {
+      return { url: att, filename: att.split('/').pop() || 'File' };
+    }
+
+    return {
+      url: att.url || '',
+      filename: att.filename || att.url?.split('/').pop() || 'File',
+      id: att.id,
+    };
   };
 
-  return (
-    <div>
-      <div className="mt-4 grid grid-cols-3 gap-3">
-        {attachments.map((a) => (
-          <button key={a} onClick={() => openItem(a)} className="p-3 bg-background/10 rounded-lg border border-border text-left truncate">
-            <div className="font-bold">{a.split('/').pop()}</div>
-            <div className="text-xs text-foreground/40">Open</div>
-          </button>
-        ))}
-      </div>
+  const isImage = (url: string) => /\.(png|jpe?g|gif|webp|svg)$/i.test(url);
+  const isVideo = (url: string) => /\.(mp4|webm|ogg)$/i.test(url);
 
-      {open && active && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-6">
-          <div className="w-full max-w-4xl bg-background rounded-lg p-4">
-            <div className="flex justify-between items-center mb-4">
-              <div className="font-bold">{active.split('/').pop()}</div>
-              <button onClick={() => setOpen(false)} className="text-foreground/60">Close</button>
+  return (
+    <div className="grid grid-cols-2 gap-4">
+      {attachments.map((att, index) => {
+        const normalized = normalizeAttachment(att);
+        const key = normalized.id || `${normalized.url || 'attachment'}-${index}`;
+
+        return (
+        <div key={key} className="relative group rounded-lg overflow-hidden border border-border bg-muted">
+          {normalized.url && isImage(normalized.url) ? (
+            <Image
+              src={normalized.url}
+              loading="eager"
+              alt={normalized.filename ?? 'attachment'}
+              width={200}
+              height={200}
+              className="object-cover w-full h-full transition-transform group-hover:scale-105"
+              onClick={() => setPreview(normalized.url)}
+            />
+          ) : normalized.url && isVideo(normalized.url) ? (
+            <video
+              src={normalized.url}
+              controls
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <div className="flex items-center justify-center h-48 text-foreground/60">
+              <span>{normalized.filename ?? 'File'}</span>
             </div>
-            <div className="h-[70vh] overflow-auto">
-              {active.match(/\.(jpg|jpeg|png|gif)$/i) ? (
-                <img src={active} alt="attachment" className="w-full h-full object-contain" />
-              ) : active.match(/\.(pdf)$/i) ? (
-                <iframe src={active} className="w-full h-full" />
-              ) : (
-                <div>
-                  <a href={active} target="_blank" rel="noreferrer" className="text-accent">Open file</a>
-                </div>
-              )}
-            </div>
-          </div>
+          )}
+        </div>
+        );
+      })}
+
+      {preview && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50" onClick={() => setPreview(null)}>
+          <button aria-label="Close preview" title="Close preview" className="absolute top-4 right-4 p-2 bg-white rounded-full" onClick={() => setPreview(null)}>
+            <X size={24} className="text-black" />
+          </button>
+          <Image src={preview} alt="preview" width={800} height={800} className="max-w-full max-h-full" />
         </div>
       )}
     </div>

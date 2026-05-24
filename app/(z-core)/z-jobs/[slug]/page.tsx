@@ -1,22 +1,29 @@
 import { campusServiceAdmin } from '@/lib/services/campusService.server';
 import { jwtVerify } from 'jose';
 import { cookies } from 'next/headers';
-import AttachmentViewer from './AttachmentViewer';
+import AttachmentViewer from '../[id]/AttachmentViewer';
 import { notFound } from 'next/navigation';
-import { Briefcase, MapPin, Building, Clock, X } from 'lucide-react';
+import { Briefcase, MapPin, Building, Clock, Share2, ArrowLeft } from 'lucide-react';
+import Link from 'next/link';
 
-type Props = { params: { id: string } };
+type Props = { params: Promise<{ slug: string }> };
+
+export async function generateMetadata({ params }: Props) {
+  const { slug } = await params;
+  const job = (await campusServiceAdmin.getOpportunityById(slug)) || (await campusServiceAdmin.getOpportunityBySlug(slug));
+  if (!job) return { title: 'Opportunity Not Found' };
+  return {
+    title: `${job.title} on Zyng`,
+    description: job.description?.substring(0, 160) || 'Check out this opportunity on Zyng.',
+  };
+}
 
 export default async function JobDetailsPage(props: Props) {
-  // `props.params` may be a Promise in some Next.js runtime versions — await to unwrap safely
-  // See: https://nextjs.org/docs/messages/sync-dynamic-apis
-  // eslint-disable-next-line @typescript-eslint/await-thenable
-  const params = await (props.params as unknown as Promise<{ id: string }>);
-  const id = params?.id;
-  const job = await campusServiceAdmin.getOpportunityById(id);
+  const { slug } = await props.params;
+  const id = slug;
+  const job = (await campusServiceAdmin.getOpportunityById(id)) || (await campusServiceAdmin.getOpportunityBySlug(id));
   if (!job) return notFound();
 
-  // determine current user from sb-access-token cookie (server-side)
   let currentUserId: string | null = null;
   try {
     const cookieStore = await cookies();
@@ -26,13 +33,20 @@ export default async function JobDetailsPage(props: Props) {
       const { payload } = await jwtVerify(token, secret);
       currentUserId = (payload.sub as string) || null;
     }
-  } catch (err) {
-    // ignore invalid token
-  }
+  } catch (err) { }
 
   return (
-    <div className="flex-1 overflow-y-auto bg-background p-6">
-      <div className="max-w-3xl mx-auto space-y-6">
+    <div className="flex-1 overflow-y-auto bg-background">
+      <div className="sticky top-0 z-20 bg-background/80 backdrop-blur-xl border-b border-border px-6 py-4 flex items-center justify-between">
+        <Link href="/z-jobs" className="p-2 bg-muted rounded-xl hover:bg-muted/80 transition flex items-center gap-2 text-sm font-bold">
+          <ArrowLeft size={16} /> Back
+        </Link>
+        <button className="p-2 bg-muted rounded-xl hover:bg-muted/80 transition flex items-center gap-2 text-sm font-bold">
+          <Share2 size={16} /> Share
+        </button>
+      </div>
+
+      <div className="max-w-3xl mx-auto space-y-6 p-6">
         <header className="flex items-start justify-between gap-4">
           <div>
             <div className="inline-flex rounded-full bg-accent/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-accent">Opportunity</div>
@@ -66,8 +80,6 @@ export default async function JobDetailsPage(props: Props) {
               {Array.isArray(job.attachments) && job.attachments.length > 0 && (
                 <div className="mt-6">
                   <h4 className="text-sm font-black mb-2">Attachments</h4>
-                  {/* AttachmentViewer is a client component that opens modal */}
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <AttachmentViewer attachments={job.attachments} />
                 </div>
               )}
@@ -80,17 +92,14 @@ export default async function JobDetailsPage(props: Props) {
             <div className="text-sm text-foreground/40">Posted</div>
             <div className="font-black">{new Date(job.created_at).toLocaleString()}</div>
           </div>
-            <div className="flex gap-2">
+          <div className="flex gap-2">
             {job.external_url ? (
-              <a href={job.external_url} target="_blank" rel="noreferrer" className="px-4 py-2 bg-accent text-black rounded-xl font-black">Apply</a>
+              <a href={job.external_url} target="_blank" rel="noreferrer" className="px-6 py-3 bg-accent text-black rounded-xl font-black hover:scale-105 transition-all">Apply Now</a>
             ) : job.accepts_applications ? (
-              <a href={`/z-jobs/${job.id}/apply`} className="px-4 py-2 bg-accent text-black rounded-xl font-black">Apply</a>
+              <a href={`/z-jobs/${slug}/apply`} className="px-6 py-3 bg-accent text-black rounded-xl font-black hover:scale-105 transition-all">Apply Now</a>
             ) : (
-              <button disabled className="px-4 py-2 bg-foreground/10 text-foreground rounded-xl font-black">Applications Closed</button>
+              <button disabled className="px-6 py-3 bg-foreground/10 text-foreground rounded-xl font-black">Closed</button>
             )}
-            {currentUserId && currentUserId === job.created_by ? (
-              <a href="/z-pro" className="px-4 py-2 border border-border rounded-xl font-bold">Edit</a>
-            ) : null}
           </div>
         </footer>
       </div>

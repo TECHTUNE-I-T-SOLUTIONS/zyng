@@ -15,6 +15,7 @@ import {
   Bell,
   LogOut,
   Briefcase as Jobs,
+  Eye,
   Mail,
   Users,
   Gift
@@ -86,6 +87,7 @@ export default function ZLayout({ children }: { children: React.ReactNode }) {
   ];
   // Sidebar-only links (not in bottom nav)
   const sidebarLinks = [
+    { name: 'Z-Sights', href: '/z-sights', icon: Eye },
     { name: 'Jobs', href: '/z-jobs', icon: Jobs },
     { name: 'Messages', href: '/z-messages', icon: Mail },
     { name: 'Notifications', href: '/z-notifications', icon: Bell },
@@ -108,13 +110,10 @@ export default function ZLayout({ children }: { children: React.ReactNode }) {
         className={
           cn(
             "w-64 border-r border-border flex flex-col p-6 shrink-0 bg-background z-50 transition-transform duration-300 lg:translate-x-0 lg:static lg:flex",
+            mobileSidebarOpen ? 'shadow-2xl shadow-black/10' : '',
             mobileSidebarOpen ? "fixed top-0 left-0 h-full translate-x-0" : "-translate-x-full lg:translate-x-0 hidden"
           )
         }
-        style={{
-          boxShadow: mobileSidebarOpen ? '0 2px 16px 0 rgba(0,0,0,0.12)' : undefined,
-          pointerEvents: mobileSidebarOpen ? 'auto' : 'auto',
-        }}
       >
         {/* Close button for mobile */}
         <div className="flex justify-between items-center mb-10 lg:mb-10">
