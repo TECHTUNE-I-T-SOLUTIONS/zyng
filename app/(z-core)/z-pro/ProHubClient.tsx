@@ -37,6 +37,9 @@ export default function ProHubClient() {
         <div className="flex gap-3">
           <button onClick={showOverview} className={`px-4 py-2 rounded-2xl font-bold ${tab==='overview'?'bg-accent text-black':'bg-muted text-foreground'}`}>Overview</button>
           <button onClick={showManage} className={`px-4 py-2 rounded-2xl font-bold ${tab==='manage'?'bg-accent text-black':'bg-muted text-foreground'}`}>Manage</button>
+          <Link href="/z-profile" className="px-4 py-2 rounded-2xl font-bold bg-muted text-foreground hover:bg-accent hover:text-black transition-all flex items-center gap-2">
+            <Settings size={16} /> Profile
+          </Link>
           <Link href="/z-pro/create-job" className="bg-muted border border-border px-5 py-2 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-accent hover:text-black transition-all flex items-center gap-2">
             <Plus size={16} /> Post
           </Link>
@@ -49,7 +52,9 @@ export default function ProHubClient() {
             <section className="bg-muted border border-border p-6 rounded-[2rem]">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-sm font-black uppercase tracking-[0.2em] text-foreground/40">Your Skills</h2>
-                <button aria-label="Settings" title="Settings" className="p-2 hover:bg-background rounded-xl transition-all"><Settings size={16} /></button>
+                <Link href="/z-profile" aria-label="Settings" title="Settings" className="p-2 hover:bg-background rounded-xl transition-all">
+                  <Settings size={16} />
+                </Link>
               </div>
               <div className="flex flex-wrap gap-2">
                 {data?.user?.skills?.length ? data.user.skills.map((skill: string) => (

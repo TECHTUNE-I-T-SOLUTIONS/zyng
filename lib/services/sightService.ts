@@ -37,6 +37,30 @@ export const sightService = {
     if (error) throw error;
     return data;
   },
+
+  async saveSight(payload: {
+    id?: string;
+    title: string;
+    description?: string;
+    category?: string;
+    link?: string;
+    images?: string[];
+    user_id: string;
+  }) {
+    const request = payload.id
+      ? supabase.from('zync_projects').update(payload).eq('id', payload.id).select('*, author:users!user_id(id, z_name, avatar_url)').single()
+      : supabase.from('zync_projects').insert(payload).select('*, author:users!user_id(id, z_name, avatar_url)').single();
+
+    const { data, error } = await request;
+    if (error) throw error;
+    return data;
+  },
+
+  async removeSight(id: string) {
+    const { data, error } = await supabase.from('zync_projects').delete().eq('id', id).select().single();
+    if (error) throw error;
+    return data;
+  },
   
   async getComments(zyncId: string) {
     const { data, error } = await supabase

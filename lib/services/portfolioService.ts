@@ -16,13 +16,15 @@ export const portfolioService = {
   },
 
   async create(payload: any) {
-    const { data, error } = await supabase.from('portfolios').insert([payload]).select().single();
+    const { id: _id, ...insertPayload } = payload || {};
+    const { data, error } = await supabase.from('portfolios').insert([insertPayload]).select().single();
     if (error) throw error;
     return data;
   },
 
   async update(id: string, payload: any) {
-    const { data, error } = await supabase.from('portfolios').update(payload).eq('id', id).select().single();
+    const { id: _id, ...updatePayload } = payload || {};
+    const { data, error } = await supabase.from('portfolios').update(updatePayload).eq('id', id).select().single();
     if (error) throw error;
     return data;
   },

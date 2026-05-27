@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { trendsService } from '@/lib/services/trendsService';
@@ -25,7 +25,7 @@ import { useToast } from '@/components/toast';
 import { cn } from '@/lib/utils';
 import { userService } from '@/lib/services/userService';
 import { ThemeToggle } from '@/components/theme-toggle';
-import { useEffect } from 'react';
+import { supabase } from '@/lib/db/supabase';
 
 export default function ZLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -35,6 +35,23 @@ export default function ZLayout({ children }: { children: React.ReactNode }) {
   const { data: user } = useQuery({ 
     queryKey: ['z-layout-me'], 
     queryFn: () => userService.getCurrentUser() 
+  });
+  const { data: unreadNotificationCount = 0, refetch: refetchUnreadNotificationCount } = useQuery({
+    queryKey: ['notification-unread-count', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return 0;
+
+      const { count, error } = await supabase
+        .from('notifications')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .eq('is_read', false);
+
+      if (error) throw error;
+      return count || 0;
+    },
+    enabled: !!user?.id,
+    staleTime: 0,
   });
 
   const { data: trends, error: trendsError, isLoading } = useQuery({ queryKey: ['trending_hashtags'], queryFn: () => trendsService.getTrendingHashtags(), staleTime: 0, refetchOnMount: true });
@@ -60,6 +77,33 @@ export default function ZLayout({ children }: { children: React.ReactNode }) {
     })();
     return () => { mounted = false; };
   }, []);
+
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const channel = supabase
+      .channel(`notifications-unread-${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'notifications',
+          filter: `user_id=eq.${user.id}`,
+        },
+        () => {
+          void refetchUnreadNotificationCount();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [refetchUnreadNotificationCount, user?.id]);
+
+  const unreadBadgeText = unreadNotificationCount > 99 ? '99+' : String(unreadNotificationCount);
+  const hasUnreadNotifications = unreadNotificationCount > 0;
 
   const shareInvite = async () => {
     const code = user?.referral_code || 'ZYNG-USER-XXXX';
@@ -90,7 +134,7 @@ export default function ZLayout({ children }: { children: React.ReactNode }) {
     { name: 'Z-Sights', href: '/z-sights', icon: Eye },
     { name: 'Jobs', href: '/z-jobs', icon: Jobs },
     { name: 'Messages', href: '/z-messages', icon: Mail },
-    { name: 'Notifications', href: '/z-notifications', icon: Bell },
+    { name: 'Notifications', href: '/z-notifications', icon: Bell, badge: unreadNotificationCount },
     { name: 'Referrals', href: '/z-referral', icon: Gift },
     { name: 'Profile', href: '/z-profile', icon: Users },
   ];
@@ -145,6 +189,11 @@ export default function ZLayout({ children }: { children: React.ReactNode }) {
             >
               <item.icon size={18} />
               <span className="font-semibold">{item.name}</span>
+              {'badge' in item && typeof item.badge === 'number' && item.badge > 0 && (
+                <span className="ml-auto inline-flex min-w-6 items-center justify-center rounded-full bg-accent px-2 py-0.5 text-[10px] font-black text-black">
+                  {item.badge > 99 ? '99+' : item.badge}
+                </span>
+              )}
             </Link>
           ))}
         </nav>
@@ -183,7 +232,14 @@ export default function ZLayout({ children }: { children: React.ReactNode }) {
           </Link>
           <div className="flex items-center gap-2">
               <Link href="/z-search" aria-label="Search"><Search size={20} className="text-foreground/60 hover:text-accent" /></Link>
-              <Link href="/z-notifications" aria-label="Notifications"><Bell size={20} className="text-foreground/60 hover:text-accent" /></Link>
+              <Link href="/z-notifications" aria-label={`Notifications${hasUnreadNotifications ? `, ${unreadBadgeText} unread` : ''}`} className="relative inline-flex items-center justify-center">
+                <Bell size={20} className="text-foreground/60 hover:text-accent" />
+                {hasUnreadNotifications && (
+                  <span className="absolute -right-2 -top-2 inline-flex min-w-5 items-center justify-center rounded-full bg-accent px-1.5 py-0.5 text-[9px] font-black text-black shadow-lg shadow-accent/30">
+                    {unreadBadgeText}
+                  </span>
+                )}
+              </Link>
               <ThemeToggle />
               <Link href="/z-personas" aria-label="Profile">
                 <div className="w-8 h-8 rounded-full bg-accent flex items-center justify-center font-bold text-black">

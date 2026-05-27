@@ -93,6 +93,16 @@ export interface Reply {
   content: string;
   created_at: string;
   persona?: Persona;
+  reactions?: Reaction[];
+}
+
+export interface Reaction {
+  id?: string;
+  user_id: string;
+  type: string;
+  post_id?: string;
+  reply_id?: string;
+  created_at?: string;
 }
 
 export interface ZingRoom {

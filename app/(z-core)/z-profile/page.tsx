@@ -7,11 +7,23 @@ import { userService } from '@/lib/services/userService';
 import { postService } from '@/lib/services/postService';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useToast } from '@/components/toast';
-import { Settings, Shield, LogOut, Award, Users, BookOpen, Loader2, X } from 'lucide-react';
+import { Pencil, Shield, LogOut, Award, Users, BookOpen, Loader2, X } from 'lucide-react';
 import { supabase } from '@/lib/db/supabase';
 
 export default function ProfilePage() {
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [profileEditing, setProfileEditing] = useState(false);
+  const [profileDraft, setProfileDraft] = useState({
+    full_name: '',
+    z_name: '',
+    email: '',
+    phone: '',
+    course_of_study: '',
+    graduation_date: '',
+    bio: '',
+    hobbies: '',
+    skills: '',
+  });
   const fileRef = useRef<HTMLInputElement | null>(null);
   const { data: user, isLoading } = useQuery({
     queryKey: ['me'],
@@ -20,6 +32,23 @@ export default function ProfilePage() {
 
   const queryClient = useQueryClient();
   const toast = useToast();
+  const profileUser = user as any;
+
+  useEffect(() => {
+    if (!user) return;
+    setProfileDraft({
+      full_name: user.full_name || '',
+      z_name: user.z_name || '',
+      email: user.email || '',
+      phone: user.phone || '',
+      course_of_study: user.course_of_study || '',
+      graduation_date: user.graduation_date || '',
+      bio: user.bio || '',
+      hobbies: Array.isArray(user.hobbies) ? user.hobbies.join(', ') : '',
+      skills: Array.isArray(user.skills) ? user.skills.join(', ') : '',
+    });
+  }, [user]);
+
   const { data: myPosts, isLoading: postsLoading } = useQuery({
     queryKey: ['posts', 'me'],
     queryFn: () => user?.id ? postService.getPostsByUser(user.id) : Promise.resolve([]),
@@ -73,6 +102,32 @@ export default function ProfilePage() {
   const deleteMutation = useMutation({
     mutationFn: (id: string) => postService.deletePost(id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['posts', 'me'] }),
+  });
+
+  const profileMutation = useMutation({
+    mutationFn: async () => {
+      const parseList = (value: string) => value.split(',').map((item) => item.trim()).filter(Boolean);
+      await userService.updateProfile({
+        full_name: profileDraft.full_name.trim() || undefined,
+        z_name: profileDraft.z_name.trim() || undefined,
+        email: profileDraft.email.trim() || undefined,
+        phone: profileDraft.phone.trim(),
+        course_of_study: profileDraft.course_of_study.trim() || undefined,
+        graduation_date: profileDraft.graduation_date || undefined,
+        bio: profileDraft.bio.trim() || undefined,
+        hobbies: parseList(profileDraft.hobbies),
+        skills: parseList(profileDraft.skills),
+      });
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['me'] });
+      toast.show('Profile updated', 'success');
+      setProfileEditing(false);
+    },
+    onError: (error) => {
+      console.error('Profile update failed', error);
+      toast.show('Profile update failed', 'error');
+    },
   });
 
   const handleSignOut = async () => {
@@ -195,8 +250,13 @@ export default function ProfilePage() {
       <div className="max-w-4xl mx-auto">
         <header className="flex items-center justify-between mb-10">
           <h1 className="text-4xl font-black tracking-tighter uppercase">Zynger Profile</h1>
-          <button title="Settings" className="p-3 bg-muted border border-border rounded-xl hover:bg-muted/80 transition-all">
-            <Settings size={20} />
+          <button
+            title={profileEditing ? 'Stop editing' : 'Edit profile'}
+            onClick={() => setProfileEditing((current) => !current)}
+            className="inline-flex items-center gap-2 p-3 bg-muted border border-border rounded-xl hover:bg-muted/80 transition-all font-black text-xs uppercase tracking-widest"
+          >
+            <Pencil size={18} />
+            {profileEditing ? 'Close editor' : 'Edit profile'}
           </button>
         </header>
 
@@ -226,7 +286,7 @@ export default function ProfilePage() {
                   <div className="flex items-center gap-2 text-foreground/40 text-[10px] font-black uppercase mb-1">
                     <BookOpen size={12} /> University
                   </div>
-                  <div className="text-sm font-bold">{user.school?.name || 'Not Selected'}</div>
+                  <div className="text-sm font-bold">{profileUser.school?.name || profileUser.schools?.[0]?.name || 'Not Selected'}</div>
                 </div>
                 <div className="bg-background/40 p-4 rounded-2xl border border-border/50">
                   <div className="flex items-center gap-2 text-foreground/40 text-[10px] font-black uppercase mb-1">
@@ -238,6 +298,79 @@ export default function ProfilePage() {
               <div className="mt-4">
                 <input title="Upload Avatar" ref={fileRef} type="file" accept="image/*" onChange={handleAvatarChange} className="hidden" />
                 <button onClick={handleAvatarPick} className="mt-3 bg-muted px-4 py-2 rounded-xl text-sm">Upload Avatar</button>
+              </div>
+
+              <div className="mt-8 rounded-[1.75rem] border border-border/50 bg-background/40 p-5">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-5">
+                  <div>
+                    <h3 className="text-xs font-black uppercase tracking-widest text-foreground/40">Profile details</h3>
+                    <p className="text-sm text-foreground/50 mt-1">Everything stored on your users record.</p>
+                  </div>
+                  {profileEditing && (
+                    <button
+                      type="button"
+                      onClick={() => profileMutation.mutate()}
+                      disabled={profileMutation.isPending}
+                      className="inline-flex items-center justify-center gap-2 rounded-xl bg-accent px-4 py-2 text-xs font-black uppercase tracking-widest text-black disabled:opacity-60"
+                    >
+                      {profileMutation.isPending ? 'Saving…' : 'Save changes'}
+                    </button>
+                  )}
+                </div>
+
+                {profileEditing ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <ProfileField label="Full name" value={profileDraft.full_name} onChange={(value: string) => setProfileDraft((current) => ({ ...current, full_name: value }))} />
+                      <ProfileField label="Z name" value={profileDraft.z_name} onChange={(value: string) => setProfileDraft((current) => ({ ...current, z_name: value }))} />
+                      <ProfileField label="Email" value={profileDraft.email} onChange={(value: string) => setProfileDraft((current) => ({ ...current, email: value }))} />
+                      <ProfileField label="Phone" value={profileDraft.phone} onChange={(value: string) => setProfileDraft((current) => ({ ...current, phone: value }))} />
+                      <ProfileField label="Course of study" value={profileDraft.course_of_study} onChange={(value: string) => setProfileDraft((current) => ({ ...current, course_of_study: value }))} />
+                      <ProfileField label="Graduation date" value={profileDraft.graduation_date} type="date" onChange={(value: string) => setProfileDraft((current) => ({ ...current, graduation_date: value }))} />
+                      <ProfileField label="Hobbies" value={profileDraft.hobbies} onChange={(value: string) => setProfileDraft((current) => ({ ...current, hobbies: value }))} helper="Comma separated" />
+                      <ProfileField label="Skills" value={profileDraft.skills} onChange={(value: string) => setProfileDraft((current) => ({ ...current, skills: value }))} helper="Comma separated" />
+                    <div className="md:col-span-2">
+                      <label className="text-[10px] font-black uppercase tracking-[0.2em] text-foreground/40">Bio</label>
+                      <textarea
+                        value={profileDraft.bio}
+                        onChange={(e) => setProfileDraft((current) => ({ ...current, bio: e.target.value }))}
+                        placeholder="Tell people who you are and what you care about"
+                        className="mt-1 w-full min-h-32 rounded-2xl border border-border bg-background px-4 py-3 text-sm outline-none focus:border-accent"
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                    {[
+                      ['User ID', profileUser.id],
+                      ['Phone', profileUser.phone],
+                      ['Email', profileUser.email || 'Not set'],
+                      ['Full name', profileUser.full_name || 'Not set'],
+                      ['Z name', profileUser.z_name || 'Not set'],
+                      ['Status', profileUser.status || 'Not set'],
+                      ['Graduation date', profileUser.graduation_date ? new Date(profileUser.graduation_date).toLocaleDateString() : 'Not set'],
+                      ['School', profileUser.school?.name || profileUser.schools?.[0]?.name || 'Not set'],
+                      ['Faculty', profileUser.faculty?.name || profileUser.faculties?.[0]?.name || 'Not set'],
+                      ['Department', profileUser.department?.name || profileUser.departments?.[0]?.name || 'Not set'],
+                      ['Course of study', profileUser.course_of_study || 'Not set'],
+                      ['Hobbies', Array.isArray(profileUser.hobbies) && profileUser.hobbies.length ? profileUser.hobbies.join(', ') : 'Not set'],
+                      ['Skills', Array.isArray(profileUser.skills) && profileUser.skills.length ? profileUser.skills.join(', ') : 'Not set'],
+                      ['Bio', profileUser.bio || 'Not set'],
+                      ['Trust score', String(profileUser.trust_score ?? 0)],
+                      ['Verified', profileUser.is_verified ? 'Yes' : 'No'],
+                      ['Held', profileUser.is_held ? 'Yes' : 'No'],
+                      ['Referral code', profileUser.referral_code || 'Not set'],
+                      ['Onboarding completed', profileUser.onboarding_completed ? 'Yes' : 'No'],
+                      ['Last login', profileUser.last_login ? new Date(profileUser.last_login).toLocaleString() : 'Not set'],
+                      ['Created at', profileUser.created_at ? new Date(profileUser.created_at).toLocaleString() : 'Not set'],
+                      ['Avatar URL', profileUser.avatar_url || 'Not set'],
+                    ].map(([label, value]) => (
+                      <div key={label} className="rounded-2xl border border-border/50 bg-background px-4 py-3 flex flex-col gap-1">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-foreground/40">{label}</span>
+                        <span className="text-sm font-semibold break-words">{String(value)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </motion.div>
 
@@ -330,10 +463,7 @@ export default function ProfilePage() {
               <h3 className="text-2xl font-black text-accent mb-2">TRUST SCORE</h3>
               <div className="text-5xl font-black mb-4">{user.trust_score}</div>
               <div className="w-full bg-accent/20 h-2 rounded-full overflow-hidden">
-                <div 
-                  className="bg-accent h-full transition-all duration-1000" 
-                  style={{ width: `${Math.min(user.trust_score / 10, 100)}%` }} 
-                />
+                <div className="bg-accent h-full transition-all duration-1000" />
               </div>
               <p className="text-[10px] text-accent/60 font-bold uppercase mt-4 tracking-tighter">
                 {user.trust_score > 500 ? 'TOP 1% OF CAMPUS' : 'BUILDING REPUTATION'}
@@ -556,5 +686,33 @@ export default function ProfilePage() {
         )}
       </AnimatePresence>
     </div>
+  );
+}
+
+function ProfileField({
+  label,
+  value,
+  onChange,
+  type = 'text',
+  helper,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  type?: string;
+  helper?: string;
+}) {
+  return (
+    <label className="block">
+      <span className="text-[10px] font-black uppercase tracking-[0.2em] text-foreground/40">{label}</span>
+      <input
+        type={type}
+        value={value}
+        placeholder={label}
+        onChange={(event) => onChange(event.target.value)}
+        className="mt-1 w-full rounded-2xl border border-border bg-background px-4 py-3 text-sm outline-none focus:border-accent"
+      />
+      {helper && <span className="mt-1 block text-[10px] font-medium text-foreground/35">{helper}</span>}
+    </label>
   );
 }

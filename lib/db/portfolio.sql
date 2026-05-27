@@ -54,6 +54,9 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+ALTER FUNCTION fn_notify_portfolio_change() SECURITY DEFINER;
+ALTER FUNCTION fn_notify_portfolio_change() SET search_path = public;
+
 -- Ensure triggers do not already exist
 DROP TRIGGER IF EXISTS tr_on_portfolios_change ON portfolios;
 CREATE TRIGGER tr_on_portfolios_change AFTER INSERT OR UPDATE ON portfolios FOR EACH ROW EXECUTE FUNCTION fn_notify_portfolio_change();

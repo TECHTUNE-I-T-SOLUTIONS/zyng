@@ -29,7 +29,7 @@ export const postService = {
   async getPosts(schoolId?: string) {
     let query = supabase
       .from('posts')
-      .select('*, persona:personas(*), user:users(status, z_name, full_name), replies(*, persona:personas(*)), reactions(*, user:users(z_name, full_name))')
+      .select('*, persona:personas(*), user:users(status, z_name, full_name), replies(*, persona:personas(*), reactions(*, user:users(z_name, full_name))), reactions(*, user:users(z_name, full_name))')
       .order('created_at', { ascending: false });
 
     if (schoolId) {
@@ -44,7 +44,7 @@ export const postService = {
   async getPostById(id: string) {
     const { data, error } = await supabase
       .from('posts')
-      .select('*, persona:personas(*), user:users(status, z_name, full_name), replies(*, persona:personas(*)), reactions(*, user:users(z_name, full_name))')
+      .select('*, persona:personas(*), user:users(status, z_name, full_name), replies(*, persona:personas(*), reactions(*, user:users(z_name, full_name))), reactions(*, user:users(z_name, full_name))')
       .eq('id', id)
       .single();
 
@@ -99,7 +99,7 @@ export const postService = {
   async getPostsByUser(userId: string) {
     const { data, error } = await supabase
       .from('posts')
-      .select('*, persona:personas(*), user:users(status, z_name, full_name), replies(*, persona:personas(*))')
+      .select('*, persona:personas(*), user:users(status, z_name, full_name), replies(*, persona:personas(*), reactions(*, user:users(z_name, full_name)))')
       .eq('user_id', userId)
       .order('created_at', { ascending: false });
 
@@ -143,14 +143,19 @@ export const postService = {
     return data;
   },
 
-  async createReply(postId: string, personaId: string, content: string) {
-    const { data, error } = await supabase
-      .from('replies')
-      .insert({ post_id: postId, persona_id: personaId, content })
-      .select()
-      .single();
+  async createReply(postId: string, personaId: string, content: string, parentReplyId?: string | null) {
+    const response = await fetch('/api/replies', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ post_id: postId, persona_id: personaId, content, parent_reply_id: parentReplyId || null }),
+    });
 
-    if (error) throw error;
-    return data;
+    const payload = await response.json().catch(() => null);
+    if (!response.ok) {
+      throw new Error(payload?.error || 'Failed to create reply');
+    }
+
+    return payload?.data || payload;
   }
 };
