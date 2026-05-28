@@ -16,10 +16,22 @@ import {
   Database
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/lib/db/supabase';
+import { ADMIN_ROLES, adminHasPermission } from '@/lib/admin/roles';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const { data: admin } = useQuery({
+    queryKey: ['admin-layout-me'],
+    queryFn: async () => {
+      const { data: auth } = await supabase.auth.getUser();
+      if (!auth.user) return null;
+      const { data } = await supabase.from('admins').select('email, level').eq('user_id', auth.user.id).maybeSingle();
+      return data;
+    },
+  });
 
   // Don't show sidebar on auth pages
   if (pathname.includes('/z-manage-auth')) {
@@ -27,12 +39,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   }
 
   const navItems = [
-    { name: 'Overview', href: '/z-manage/dashboard', icon: Activity },
-    { name: 'Zyngers', href: '/z-manage/users', icon: Users },
-    { name: 'Content', href: '/z-manage/content', icon: FileWarning },
-    { name: 'Platform', href: '/z-manage/system', icon: Settings },
-    { name: 'Database', href: '/z-manage/db', icon: Database },
-  ];
+    { name: 'Overview', href: '/z-manage/dashboard', icon: Activity, permission: 'dashboard.read' as const },
+    { name: 'Zyngers', href: '/z-manage/users', icon: Users, permission: 'users.manage' as const },
+    { name: 'Content', href: '/z-manage/content', icon: FileWarning, permission: 'content.moderate' as const },
+    { name: 'Support', href: '/z-manage/support', icon: Bell, permission: 'submissions.manage' as const },
+    { name: 'Platform', href: '/z-manage/system', icon: Settings, permission: 'maintenance.manage' as const },
+    { name: 'Database', href: '/z-manage/db', icon: Database, permission: 'database.read' as const },
+  ].filter((item) => !admin?.level || adminHasPermission(admin.level, item.permission));
 
   return (
     <div className="flex h-screen bg-black text-white overflow-hidden font-sans">
@@ -104,8 +117,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             
             <div className="flex items-center gap-4 pl-6 border-l border-white/5">
               <div className="text-right">
-                <div className="text-sm font-black tracking-tight">Super Admin</div>
-                <div className="text-[10px] font-black text-accent uppercase">Global Level</div>
+                <div className="text-sm font-black tracking-tight">{ADMIN_ROLES[(admin?.level as keyof typeof ADMIN_ROLES) || 'support']?.label || 'Admin'}</div>
+                <div className="text-[10px] font-black text-accent uppercase">{admin?.email || 'Checking access'}</div>
               </div>
               <div className="w-10 h-10 rounded-xl bg-white/10 border border-white/10" />
             </div>
@@ -144,7 +157,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               <div className="flex flex-col gap-3">
                 <button 
                   className="w-full bg-red-500 text-white py-4 rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-red-600 transition-all"
-                  onClick={() => window.location.href = '/z-manage-auth/login'}
+                  onClick={async () => { await supabase.auth.signOut(); window.location.href = '/z-manage-auth/login'; }}
                 >
                   Yes, Sign Out
                 </button>

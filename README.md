@@ -1,4 +1,6 @@
-# Zyng
+<p align="center">
+Zyng
+</p>
 
 <p align="center">
   <img src="public/logo.png" alt="Zyng logo" width="96" />
@@ -14,9 +16,6 @@
   <a href="public/documentations.md">Developer Docs</a> ·
   <a href="lib/db/schema.sql">Schema</a> ·
   <a href="public/vibecoding.md">Vibe Coders</a>
-</p>
-
-<p align="center
 </p>
 
 ## Overview

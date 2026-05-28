@@ -4,8 +4,11 @@ import { useState } from 'react';
 import { motion } from 'motion/react';
 import { Shield, Lock, Mail, ArrowRight, Loader2 } from 'lucide-react';
 import Link from 'next/link';
+import { supabase } from '@/lib/db/supabase';
+import { useRouter } from 'next/navigation';
 
 export default function AdminLogin() {
+  const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -14,7 +17,7 @@ export default function AdminLogin() {
   const isEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
   const isPasswordValid = password.length >= 8;
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!isEmailValid || !isPasswordValid) {
       setError('Enter a valid admin email and a password that is at least 8 characters long.');
@@ -22,7 +25,26 @@ export default function AdminLogin() {
     }
     setError('');
     setLoading(true);
-    // Logic will go here
+    try {
+      const { data, error: authError } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+      if (authError || !data.user) throw authError || new Error('Unable to sign in');
+
+      const { data: admin, error: adminError } = await supabase
+        .from('admins')
+        .select('id, level')
+        .eq('user_id', data.user.id)
+        .maybeSingle();
+
+      if (adminError || !admin) {
+        await supabase.auth.signOut();
+        throw new Error('This account does not have admin access.');
+      }
+
+      router.push('/z-manage/dashboard');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Admin login failed.');
+      setLoading(false);
+    }
   };
 
   return (

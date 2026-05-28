@@ -15,10 +15,21 @@ import {
   Trash2,
   Loader2
 } from 'lucide-react';
+import { adminHasPermission } from '@/lib/admin/roles';
 
 export default function AdminUsersPage() {
   const [search, setSearch] = useState('');
-  const isSuperAdmin = true;
+  const { data: admin } = useQuery({
+    queryKey: ['admin-users-me'],
+    queryFn: async () => {
+      const { data: auth } = await supabase.auth.getUser();
+      if (!auth.user) return null;
+      const { data } = await supabase.from('admins').select('level').eq('user_id', auth.user.id).maybeSingle();
+      return data;
+    },
+  });
+  const canManageUsers = adminHasPermission(admin?.level, 'users.manage');
+  const isSuperAdmin = admin?.level === 'super';
 
   const { data: users, isLoading, refetch } = useQuery({
     queryKey: ['admin-users', search],
@@ -32,6 +43,7 @@ export default function AdminUsersPage() {
   });
 
   const handleHoldAccount = async (userId: string, isHeld: boolean) => {
+    if (!canManageUsers) return;
     const { error } = await supabase.from('users').update({ is_held: !isHeld }).eq('id', userId);
     if (!error) refetch();
   };
@@ -108,13 +120,15 @@ export default function AdminUsersPage() {
                 <td className="p-6 text-xs text-white/40">{new Date(user.created_at).toLocaleDateString()}</td>
                 <td className="p-6 text-right">
                   <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button 
-                      onClick={() => handleHoldAccount(user.id, user.is_held)}
-                      className="p-2 hover:bg-white/10 rounded-lg transition-colors text-white/40 hover:text-white"
-                      title={user.is_held ? "Unfreeze Account" : "Freeze Account"}
-                    >
-                      {user.is_held ? <Unlock size={18} /> : <Lock size={18} />}
-                    </button>
+                    {canManageUsers && (
+                      <button 
+                        onClick={() => handleHoldAccount(user.id, user.is_held)}
+                        className="p-2 hover:bg-white/10 rounded-lg transition-colors text-white/40 hover:text-white"
+                        title={user.is_held ? "Unfreeze Account" : "Freeze Account"}
+                      >
+                        {user.is_held ? <Unlock size={18} /> : <Lock size={18} />}
+                      </button>
+                    )}
                     {isSuperAdmin && (
                       <button 
                         onClick={() => handleNukeUser(user.id)}

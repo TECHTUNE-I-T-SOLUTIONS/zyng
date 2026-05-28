@@ -73,17 +73,19 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
           </nav>
 
           <div className="flex gap-3 sm:gap-4 items-center">
-            <Link
-              href="/in/login"
-              className="text-xs hidden md:inline-block font-black uppercase tracking-widest px-6 py-2.5 border border-border rounded-full hover:bg-muted transition-all"
-            >
-              Login
-            </Link>
+            {!user && (
+              <Link
+                href="/in/login"
+                className="text-xs hidden md:inline-block font-black uppercase tracking-widest px-6 py-2.5 border border-border rounded-full hover:bg-muted transition-all"
+              >
+                Login
+              </Link>
+            )}
             <Link
               href={user ? dashboardHref : '/in/signup'}
               className="text-xs font-black uppercase tracking-widest px-6 py-2.5 bg-accent text-black rounded-full shadow-lg shadow-accent/20 hover:scale-105 transition-all text-center"
             >
-              {user ? 'Zyng' : 'Join'}
+              {user ? 'Zyng In' : 'Join'}
             </Link>
             <div className="md:hidden ml-1">
               <ThemeToggle />

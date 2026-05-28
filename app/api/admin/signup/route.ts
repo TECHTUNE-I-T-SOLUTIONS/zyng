@@ -6,9 +6,7 @@ export async function POST(request: Request) {
   try {
     const guard = await requireAdmin(request as any);
     if ('error' in guard) return NextResponse.json({ error: guard.error }, { status: guard.status });
-    if (guard.admin.level !== 'super') {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
+    if (guard.admin.level !== 'super') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
     const { email, password, full_name, z_name, admin_level, secret_code } = await request.json();
 
@@ -21,7 +19,7 @@ export async function POST(request: Request) {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email).trim())) {
       return NextResponse.json({ error: 'Invalid email address' }, { status: 400 });
     }
-    if (!['super', 'admin', 'sub', 'moderator'].includes(String(admin_level || 'moderator'))) {
+    if (!['super', 'admin', 'sub', 'moderator', 'support'].includes(String(admin_level || 'moderator'))) {
       return NextResponse.json({ error: 'Invalid admin level' }, { status: 400 });
     }
     if (String(secret_code).length < 6) {

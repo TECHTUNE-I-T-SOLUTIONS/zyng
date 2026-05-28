@@ -1,7 +1,8 @@
 import { NextRequest } from 'next/server';
 import { supabaseAdmin } from '@/lib/db/supabase-admin';
+import { AdminPermission, adminHasPermission } from '@/lib/admin/roles';
 
-export async function requireAdmin(request: NextRequest) {
+export async function requireAdmin(request: NextRequest, permission?: AdminPermission) {
   const authHeader = request.headers.get('authorization');
   const bearerToken = authHeader?.toLowerCase().startsWith('bearer ') ? authHeader.slice(7) : null;
   const cookieToken = request.cookies.get('sb-access-token')?.value || null;
@@ -23,6 +24,10 @@ export async function requireAdmin(request: NextRequest) {
     .maybeSingle();
 
   if (adminError || !admin) {
+    return { error: 'Forbidden', status: 403 as const };
+  }
+
+  if (permission && !adminHasPermission(admin.level, permission)) {
     return { error: 'Forbidden', status: 403 as const };
   }
 

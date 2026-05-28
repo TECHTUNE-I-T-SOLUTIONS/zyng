@@ -22,7 +22,7 @@ export default function AdminSignup() {
   const isSecretValid = form.secretCode.trim().length >= 6;
   const isNameValid = form.full_name.trim().length >= 2;
   const isZNameValid = form.z_name.trim().length >= 2;
-  const isLevelValid = ['super', 'admin', 'sub', 'moderator'].includes(form.adminLevel);
+  const isLevelValid = ['super', 'admin', 'sub', 'moderator', 'support'].includes(form.adminLevel);
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -46,6 +46,9 @@ export default function AdminSignup() {
         }),
       });
       if (!res.ok) throw new Error((await res.json()).error || 'Admin signup failed');
+      window.location.href = '/z-manage/dashboard';
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Admin signup failed');
     } finally {
       setLoading(false);
     }
@@ -68,7 +71,7 @@ export default function AdminSignup() {
           <Input icon={User} value={form.full_name} onChange={(v: string) => { setForm({ ...form, full_name: v }); setError(''); }} placeholder="Full Name" invalid={form.full_name.length > 0 && !isNameValid} />
           <Input icon={User} value={form.z_name} onChange={(v: string) => { setForm({ ...form, z_name: v }); setError(''); }} placeholder="Display / Z Name" invalid={form.z_name.length > 0 && !isZNameValid} />
           <Input icon={Lock} type="password" value={form.password} onChange={(v: string) => { setForm({ ...form, password: v }); setError(''); }} placeholder="Create Password" invalid={form.password.length > 0 && !isPasswordValid} />
-          <Input icon={BadgeCheck} value={form.adminLevel} onChange={(v: string) => { setForm({ ...form, adminLevel: v }); setError(''); }} placeholder="admin / sub / moderator / super" invalid={!isLevelValid} />
+          <Input icon={BadgeCheck} value={form.adminLevel} onChange={(v: string) => { setForm({ ...form, adminLevel: v }); setError(''); }} placeholder="super / admin / sub / moderator / support" invalid={!isLevelValid} />
           <Input icon={Key} value={form.secretCode} onChange={(v: string) => { setForm({ ...form, secretCode: v }); setError(''); }} placeholder="Super Secret Code" invalid={form.secretCode.length > 0 && !isSecretValid} />
           <button type="submit" disabled={loading || !isEmailValid || !isPasswordValid || !isSecretValid || !isNameValid || !isZNameValid || !isLevelValid} className="w-full bg-white text-black py-4 rounded-2xl font-black uppercase tracking-widest text-sm hover:bg-accent transition-all flex items-center justify-center gap-2 disabled:opacity-50">
             {loading ? <Loader2 className="animate-spin" /> : 'INITIALIZE ACCOUNT'}
