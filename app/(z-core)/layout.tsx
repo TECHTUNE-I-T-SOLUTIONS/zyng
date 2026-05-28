@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { trendsService } from '@/lib/services/trendsService';
 import { 
@@ -26,9 +27,11 @@ import { cn } from '@/lib/utils';
 import { userService } from '@/lib/services/userService';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { supabase } from '@/lib/db/supabase';
+import { getPersonaDisplay, graduationHasPassed } from '@/lib/persona-utils';
 
 export default function ZLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   // removed debug UI state
@@ -59,12 +62,34 @@ export default function ZLayout({ children }: { children: React.ReactNode }) {
   const [trendsLocal, setTrendsLocal] = useState<any[] | null>(null);
 
   const toast = useToast();
+  const personaDisplay = getPersonaDisplay(user);
+  const [graduating, setGraduating] = useState(false);
 
   if (trendsError) console.error('[ZLayout] trends query error', trendsError);
   if (moodError) console.error('[ZLayout] mood query error', moodError);
   if (Array.isArray(trends) && trends.length > 0) console.debug('[ZLayout] trends (client) count', trends.length, trends.slice(0,5));
 
   // also fetch directly into local state to ensure UI updates
+  useEffect(() => {
+    if (!user) return;
+    if (user.status === 'alumni') {
+      router.replace(pathname?.replace(/^\/z-/, '/z-alumni/') || '/z-alumni/feed');
+      return;
+    }
+    if (graduationHasPassed(user.graduation_date)) {
+      window.setTimeout(() => setGraduating(true), 0);
+      userService.updateProfile({ status: 'alumni' })
+        .then(() => {
+          window.setTimeout(() => router.replace('/z-alumni/feed'), 1400);
+        })
+        .catch((err) => {
+          console.error('Failed to graduate user', err);
+          toast.show('We could not update your alumni status. Please try again.', 'error');
+          setGraduating(false);
+        });
+    }
+  }, [pathname, router, toast, user]);
+
   useEffect(() => {
     let mounted = true;
     (async () => {
@@ -116,7 +141,6 @@ export default function ZLayout({ children }: { children: React.ReactNode }) {
         toast.show('Invite link copied to clipboard', 'success');
       }
     } catch (err) {
-      const [showDebug, setShowDebug] = useState(false); // Debug UI state
       try { await navigator.clipboard.writeText(url); toast.show('Invite link copied to clipboard', 'success'); } catch {}
     }
   };
@@ -203,10 +227,10 @@ export default function ZLayout({ children }: { children: React.ReactNode }) {
             <div className="bg-gradient-to-tr from-accent/20 to-transparent p-4 rounded-2xl border border-accent/10 group-hover:border-accent/30 transition-all">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-full bg-accent flex items-center justify-center font-bold text-black">
-                  {user?.z_name?.[0]?.toUpperCase() || user?.full_name?.[0]?.toUpperCase() || 'Z'}
+                  {personaDisplay.name?.[0]?.toUpperCase() || 'Z'}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="text-sm font-bold truncate">{user?.z_name || user?.full_name || 'Your Persona'}</div>
+                  <div className="text-sm font-bold truncate">{personaDisplay.name || 'Your Persona'}</div>
                   <div className="text-[10px] text-accent uppercase font-bold tracking-tight">
                     Trust: {user?.trust_score ?? 0}
                   </div>
@@ -243,7 +267,7 @@ export default function ZLayout({ children }: { children: React.ReactNode }) {
               <ThemeToggle />
               <Link href="/z-personas" aria-label="Profile">
                 <div className="w-8 h-8 rounded-full bg-accent flex items-center justify-center font-bold text-black">
-                  {user?.z_name?.[0]?.toUpperCase() || user?.full_name?.[0]?.toUpperCase() || 'Z'}
+                  {personaDisplay.name?.[0]?.toUpperCase() || 'Z'}
                 </div>
               </Link>
           </div>
@@ -338,6 +362,20 @@ export default function ZLayout({ children }: { children: React.ReactNode }) {
            </button>
         </div>
       </aside>
+      <AnimatePresence>
+        {graduating && (
+          <motion.div className="fixed inset-0 z-[100] flex items-center justify-center bg-background p-6 text-center">
+            <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 18 }} className="max-w-lg">
+              <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-3xl bg-accent text-4xl font-black text-black">Z</div>
+              <h2 className="text-3xl font-black tracking-tight">Congratulations on graduating.</h2>
+              <p className="mt-4 text-sm font-medium text-foreground/60">You are now becoming an alumni of your school. Setting up your alumni experience...</p>
+              <div className="mx-auto mt-8 h-1.5 w-56 overflow-hidden rounded-full bg-muted">
+                <motion.div className="h-full bg-accent" initial={{ width: '0%' }} animate={{ width: '100%' }} transition={{ duration: 1.2 }} />
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

@@ -1,25 +1,48 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
+import { use, useState } from 'react';
 import { supabase } from '@/lib/db/supabase';
 import { userService } from '@/lib/services/userService';
 import { zingService } from '@/lib/services/zingService';
 import { useRouter } from 'next/navigation';
-import { ShoppingBag, ArrowLeft, Loader2, MessageCircle, Share2 } from 'lucide-react';
+import { ShoppingBag, ArrowLeft, Loader2, MessageCircle, Share2, X } from 'lucide-react';
 import Link from 'next/link';
+import { extractIdFromSlug } from '@/lib/utils';
 
-export default function MarketplaceItemPage({ params }: { params: { id: string } }) {
+export default function MarketplaceItemPage({ params }: { params: Promise<{ id?: string }> }) {
   const router = useRouter();
   const { data: user } = useQuery({ queryKey: ['me'], queryFn: () => userService.getCurrentUser() });
+  const resolvedParams = use(params);
+  const itemId = extractIdFromSlug(resolvedParams?.id);
+  const [modal, setModal] = useState<{ title: string; message: string } | null>(null);
 
   const { data: item, isLoading } = useQuery({
-    queryKey: ['marketplace-item', params.id],
+    queryKey: ['marketplace-item', itemId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('zing_marketplace')
-        .select('*, seller:users!created_by(id, z_name, avatar_url)')
-        .eq('id', params.id)
+        .select('*')
+        .eq('id', itemId)
         .single();
+      if (error) throw error;
+      return data;
+    }
+  });
+
+  const { data: posterPersona } = useQuery({
+    queryKey: ['marketplace-poster-persona', item?.created_by],
+    enabled: !!item?.created_by,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('personas')
+        .select('name, avatar_url, is_active, created_at')
+        .eq('user_id', item.created_by)
+        .eq('is_active', true)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
       if (error) throw error;
       return data;
     }
@@ -43,14 +66,20 @@ export default function MarketplaceItemPage({ params }: { params: { id: string }
   );
 
   const contactSeller = async () => {
-    if (!user) return alert("Please login to contact seller.");
-    if (user.id === item.created_by) return alert("This is your own item.");
+    if (!user) {
+      setModal({ title: 'Login Required', message: 'Please login to contact the seller.' });
+      return;
+    }
+    if (user.id === item.created_by) {
+      setModal({ title: 'Your Own Item', message: 'You cannot contact yourself for this listing.' });
+      return;
+    }
     try {
-      await zingService.sendZingRequest(item.created_by, `Hi, is "${item.title}" still available?`);
-      router.push('/z-messages');
+      const chat = await zingService.sendZingRequest(item.created_by, `Hi, is "${item.title}" still available?`);
+      router.push(`/z-messages?userId=${item.created_by}&chatId=${chat.id}`);
     } catch (err) {
       console.error(err);
-      alert("Failed to start conversation.");
+      setModal({ title: 'Conversation Error', message: 'Failed to start conversation. Please try again.' });
     }
   };
 
@@ -63,7 +92,7 @@ export default function MarketplaceItemPage({ params }: { params: { id: string }
       });
     } else {
       navigator.clipboard.writeText(window.location.href);
-      alert("Link copied to clipboard!");
+      setModal({ title: 'Link Copied', message: 'The marketplace link has been copied to your clipboard.' });
     }
   };
 
@@ -120,12 +149,14 @@ export default function MarketplaceItemPage({ params }: { params: { id: string }
 
             <div className="mt-auto space-y-6">
               <div className="p-6 bg-muted/30 border border-border rounded-2xl flex items-center gap-4">
-                <div className="w-12 h-12 bg-accent/20 rounded-full flex items-center justify-center font-bold text-accent text-lg">
-                  {item.seller?.z_name?.[0]?.toUpperCase() || '?'}
-                </div>
+                <img
+                  src={posterPersona?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${posterPersona?.name || 'seller'}`}
+                  alt={posterPersona?.name || 'Seller avatar'}
+                  className="w-12 h-12 rounded-full object-cover border border-border bg-background"
+                />
                 <div>
                   <div className="text-xs uppercase tracking-widest text-foreground/40 font-black mb-1">Listed By</div>
-                  <div className="font-bold text-lg">@{item.seller?.z_name || 'Anonymous Zynger'}</div>
+                  <div className="font-bold text-lg">{posterPersona?.name || 'Anonymous Zynger'}</div>
                 </div>
               </div>
 
@@ -139,6 +170,40 @@ export default function MarketplaceItemPage({ params }: { params: { id: string }
           </div>
         </div>
       </div>
+
+      {modal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
+          <button
+            aria-label="Close modal overlay"
+            className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+            onClick={() => setModal(null)}
+          />
+          <div className="relative w-full max-w-md rounded-[2rem] border border-border bg-background p-6 shadow-2xl">
+            <div className="flex items-center justify-between gap-4 mb-4">
+              <h2 className="text-xl font-black uppercase tracking-tight">{modal.title}</h2>
+              <button
+                type="button"
+                aria-label="Close modal"
+                title="Close modal"
+                onClick={() => setModal(null)}
+                className="p-2 rounded-xl bg-muted hover:bg-muted/80 transition"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <p className="text-sm text-foreground/60 leading-relaxed">{modal.message}</p>
+            <div className="mt-6 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setModal(null)}
+                className="px-5 py-3 rounded-2xl bg-accent text-black font-black uppercase tracking-widest text-xs"
+              >
+                OK
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -21,6 +21,7 @@ import {
   X,
   Key
 } from 'lucide-react';
+import { slugify } from '@/lib/utils';
 
 export default function RoomsPage() {
   const [activeTab, setActiveTab] = useState<'all' | 'joined'>('all');
@@ -36,8 +37,16 @@ export default function RoomsPage() {
 
   const queryClient = useQueryClient();
   const { data: rooms, isLoading } = useQuery({
-    queryKey: ['rooms', activeTab],
+    queryKey: ['rooms'],
     queryFn: () => zingService.getRooms(),
+  });
+
+  const visibleRooms = (rooms || []).filter((room: any) => {
+    if (activeTab === 'all') return true;
+    if (!user?.id) return false;
+    const isMember = Array.isArray(room.zing_room_members) && room.zing_room_members.some((member: any) => member.user_id === user.id);
+    const isOwner = room.created_by === user.id;
+    return isMember || isOwner;
   });
 
   const joinMutation = useMutation({
@@ -98,17 +107,22 @@ export default function RoomsPage() {
 
         {isLoading ? (
           <div className="flex justify-center py-20"><Loader2 className="animate-spin text-accent" /></div>
-        ) : !rooms || rooms.length === 0 ? (
+        ) : !visibleRooms || visibleRooms.length === 0 ? (
           <div className="text-center py-20 bg-muted/20 border border-dashed border-border rounded-[3rem]">
-            <p className="text-foreground/40 font-bold italic">No active rooms found. Be the first to start one!</p>
+            <p className="text-foreground/40 font-bold italic">
+              {activeTab === 'joined' && user?.id ? 'You have not joined any rooms yet.' : 'No active rooms found. Be the first to start one!'}
+            </p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {rooms.map((room, i) => {
+            {visibleRooms.map((room, i) => {
               const memberCount = Array.isArray(room.zing_room_members) ? room.zing_room_members.length : 0;
               const lastMessage = Array.isArray(room.zing_messages) && room.zing_messages.length > 0
                 ? [...room.zing_messages].sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0]
                 : null;
+              const roomMembers = Array.isArray(room.zing_room_members) ? room.zing_room_members : [];
+              const avatarMembers = roomMembers.slice(0, 4);
+              const creatorPersona = room.creator?.personas?.find((persona: any) => persona.is_active) || room.creator?.personas?.[0];
 
               const card = (
                 <motion.div
@@ -143,17 +157,30 @@ export default function RoomsPage() {
                     )}
 
                     <div className="mt-auto flex items-center justify-between">
-                              <div className="flex items-center gap-2">
-                                <div className="w-6 h-6 rounded-full bg-accent/20 border border-accent/20" />
-                                <div className="text-[10px] font-bold text-foreground/30 uppercase">{room.creator?.z_name || 'Creator'}</div>
-                              </div>
+                      <div className="flex items-center gap-2">
+                        <div className="flex -space-x-2">
+                          {avatarMembers.length > 0 ? avatarMembers.map((member: any) => (
+                            <img
+                              key={member.user_id || member.id}
+                              src={member.user?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${member.user?.z_name || 'room'}`}
+                              alt={member.user?.z_name || 'Member'}
+                              className="w-7 h-7 rounded-full border-2 border-background object-cover bg-muted"
+                            />
+                          )) : (
+                            <div className="w-7 h-7 rounded-full bg-accent/20 border border-accent/20 flex items-center justify-center text-[10px] font-black text-accent">
+                              <Users size={12} />
+                            </div>
+                          )}
+                        </div>
+                        <div className="text-[10px] font-bold text-foreground/30 uppercase">{creatorPersona?.name || room.creator?.z_name || 'Creator'}</div>
+                      </div>
                       <div>
                         {room.is_private ? (
                           <button title="Join Room" onClick={() => setShowPasswordModal(room.id)} className="p-3 bg-background border border-border rounded-xl group-hover:bg-accent group-hover:text-black transition-all">
                             <Key size={18} />
                           </button>
                         ) : (
-                          <Link href={`/z-rooms/${room.id}`} className="p-3 bg-background border border-border rounded-xl group-hover:bg-accent group-hover:text-black transition-all inline-flex items-center">
+                          <Link href={`/z-rooms/${slugify(`${room.name}-${room.id}`)}`} className="p-3 bg-background border border-border rounded-xl group-hover:bg-accent group-hover:text-black transition-all inline-flex items-center">
                             <ChevronRight size={18} />
                           </Link>
                         )}
@@ -237,7 +264,7 @@ export default function RoomsPage() {
             >
               <div className="flex items-center justify-between mb-10">
                 <h2 className="text-3xl font-black tracking-tighter uppercase italic">Start a Room</h2>
-                <button onClick={() => setShowCreateModal(false)} className="p-3 bg-muted rounded-2xl"><X size={20} /></button>
+                <button onClick={() => setShowCreateModal(false)} title="Close modal" aria-label="Close modal" className="p-3 bg-muted rounded-2xl"><X size={20} /></button>
               </div>
               
               <div className="space-y-6">

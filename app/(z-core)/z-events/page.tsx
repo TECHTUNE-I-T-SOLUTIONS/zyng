@@ -4,12 +4,15 @@ import { useQuery } from '@tanstack/react-query';
 import { useState, useRef, useEffect } from 'react';
 import { userService } from '@/lib/services/userService';
 import { campusService } from '@/lib/services/campusService';
+import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { Calendar, MapPin, Clock, Ticket, Plus, Loader2, X, Image as ImageIcon } from 'lucide-react';
+import { slugify } from '@/lib/utils';
 
 const CATEGORIES = ['General', 'Academic', 'Social', 'Sports', 'Career', 'Arts', 'Tech'];
 
 export default function EventsPage() {
+  const router = useRouter();
   const { data: events, isLoading } = useQuery({
     queryKey: ['events'],
     queryFn: () => campusService.getEvents(),
@@ -203,7 +206,7 @@ export default function EventsPage() {
                     <div className="text-xs font-bold text-foreground/30">
                       Be the first to join
                     </div>
-                    <button className="flex items-center gap-2 text-xs font-black uppercase tracking-widest bg-foreground text-background px-6 py-2 rounded-xl hover:bg-accent hover:text-black transition-all">
+                    <button onClick={() => router.push(`/z-events/${slugify(`${event.title}-${event.id}`)}`)} className="flex items-center gap-2 text-xs font-black uppercase tracking-widest bg-foreground text-background px-6 py-2 rounded-xl hover:bg-accent hover:text-black transition-all">
                       <Ticket size={16} />
                       Interested
                     </button>
@@ -222,7 +225,7 @@ export default function EventsPage() {
           <div className="relative w-full max-w-2xl bg-background border border-border p-8 rounded-[2rem] z-10 my-auto max-h-[90vh] overflow-y-auto shadow-2xl">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-2xl font-black uppercase tracking-tighter">Post Event</h2>
-              <button onClick={() => setShowPostModal(false)} className="p-2 bg-muted rounded-xl hover:bg-muted/80"><X size={20}/></button>
+              <button title="Close modal" aria-label="Close modal" onClick={() => setShowPostModal(false)} className="p-2 bg-muted rounded-xl hover:bg-muted/80"><X size={20}/></button>
             </div>
 
             {errorMsg && (
@@ -238,7 +241,7 @@ export default function EventsPage() {
                    <ImageIcon size={32} className="text-foreground/20 mb-2" />
                    <span className="text-sm font-bold">Click to add images</span>
                 </div>
-                <input ref={fileRef} type="file" accept="image/*" multiple onChange={handleImageChange} className="hidden" />
+                <input ref={fileRef} title="Upload event images" aria-label="Upload event images" type="file" accept="image/*" multiple onChange={handleImageChange} className="hidden" />
                 
                 {imagePreviews.length > 0 && (
                   <div className="flex gap-2 flex-wrap mt-4">
@@ -246,6 +249,8 @@ export default function EventsPage() {
                       <div key={i} className="relative w-20 h-20 rounded-xl overflow-hidden border border-border group">
                         <img src={src} alt="Preview" className="w-full h-full object-cover" />
                         <button 
+                          title="Remove image"
+                          aria-label="Remove image"
                           onClick={(e) => { e.stopPropagation(); removeImage(i); }} 
                           className="absolute inset-0 bg-black/50 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
                         >
@@ -259,11 +264,11 @@ export default function EventsPage() {
 
               <div className="space-y-2">
                 <label className="text-[10px] font-black uppercase text-foreground/40 tracking-widest">Title</label>
-                <input title="Title" value={title} onChange={(e) => setTitle(e.target.value)} className="w-full bg-muted border border-border rounded-2xl p-3 focus:border-accent outline-none" />
+                <input title="Title" value={title} onChange={(e) => setTitle(e.target.value)} className="w-full bg-muted border border-border rounded-2xl p-3 focus:border-accent outline-none" placeholder="Enter event title" />
               </div>
               <div className="space-y-2">
                 <label className="text-[10px] font-black uppercase text-foreground/40 tracking-widest">Category</label>
-                <select value={category} onChange={(e) => setCategory(e.target.value)} className="w-full bg-muted border border-border rounded-2xl p-3 focus:border-accent outline-none appearance-none">
+                <select title="Event category" value={category} onChange={(e) => setCategory(e.target.value)} className="w-full bg-muted border border-border rounded-2xl p-3 focus:border-accent outline-none appearance-none">
                   {CATEGORIES.map(cat => (
                     <option key={cat} value={cat}>{cat}</option>
                   ))}

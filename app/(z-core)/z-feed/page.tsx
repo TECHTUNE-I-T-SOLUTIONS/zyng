@@ -14,6 +14,7 @@ import { userService } from '@/lib/services/userService';
 import { useQuery } from '@tanstack/react-query';
 import { useQueryClient } from '@tanstack/react-query';
 import { Reply } from '@/types';
+import { ACTIVE_PERSONA_ALERT, getActivePersona } from '@/lib/persona-utils';
 
 type ReplyNode = Reply & { children: ReplyNode[] };
 
@@ -210,9 +211,9 @@ function PostCard({ post, index }: { post: Post; index: number }) {
     if (!commentText.trim()) return;
     setSubmittingComment(true);
     try {
-      const personaId = me?.personas?.[0]?.id || null;
+      const personaId = getActivePersona(me?.personas)?.id || null;
       if (!personaId) {
-        toast.show('No persona available to post as', 'error');
+        toast.show(ACTIVE_PERSONA_ALERT, 'error');
         return;
       }
       const newReply = await postService.createReply(post.id, personaId, commentText.trim(), null);
@@ -231,9 +232,9 @@ function PostCard({ post, index }: { post: Post; index: number }) {
     if (!replyText.trim()) return;
     setSubmittingReply(true);
     try {
-      const personaId = me?.personas?.[0]?.id || null;
+      const personaId = getActivePersona(me?.personas)?.id || null;
       if (!personaId) {
-        toast.show('No persona available to post as', 'error');
+        toast.show(ACTIVE_PERSONA_ALERT, 'error');
         return;
       }
 
@@ -253,6 +254,10 @@ function PostCard({ post, index }: { post: Post; index: number }) {
   const handleReact = async (type: string) => {
     if (!me?.id) {
       toast.show('Login to react', 'info');
+      return;
+    }
+    if (!getActivePersona(me?.personas)) {
+      toast.show(ACTIVE_PERSONA_ALERT, 'error');
       return;
     }
 
@@ -313,6 +318,10 @@ function PostCard({ post, index }: { post: Post; index: number }) {
   const handleReplyReact = async (replyId: string, type: string) => {
     if (!me?.id) {
       toast.show('Login to react', 'info');
+      return;
+    }
+    if (!getActivePersona(me?.personas)) {
+      toast.show(ACTIVE_PERSONA_ALERT, 'error');
       return;
     }
 

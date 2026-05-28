@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { referralService } from '@/lib/services/referralService';
 import { userService } from '@/lib/services/userService';
 import { Copy, Loader2, Megaphone } from 'lucide-react';
+import { getPersonaDisplay } from '@/lib/persona-utils';
 
 export default function AlumniReferralPage() {
   const { data: user } = useQuery({ queryKey: ['alumni-me'], queryFn: () => userService.getCurrentUser() });
@@ -29,15 +30,18 @@ export default function AlumniReferralPage() {
       </div>
       {isLoading ? <Loader2 className="animate-spin text-indigo-400" /> : (
         <div className="space-y-3">
-          {referrals?.map((r: any) => (
-            <div key={r.id} className="bg-white/5 border border-white/5 rounded-2xl p-4 flex items-center gap-3">
-              <Megaphone className="text-indigo-400" />
-              <div className="flex-1">
-                <div className="font-black">{r.referral_code}</div>
-                <div className="text-white/40 text-sm">{r.status}</div>
+          {referrals?.map((r: any) => {
+            const referred = getPersonaDisplay(r.referred);
+            return (
+              <div key={r.id} className="bg-white/5 border border-white/5 rounded-2xl p-4 flex items-center gap-3">
+                {r.referred ? <img src={referred.avatar} alt={referred.name} className="h-10 w-10 rounded-full object-cover bg-white/10" /> : <Megaphone className="text-indigo-400" />}
+                <div className="flex-1">
+                  <div className="font-black">{r.referred ? referred.name : r.referral_code}</div>
+                  <div className="text-white/40 text-sm">{r.status}</div>
+                </div>
               </div>
-            </div>
-          )) || <div className="text-white/30 italic">No referrals yet.</div>}
+            );
+          }) || <div className="text-white/30 italic">No referrals yet.</div>}
         </div>
       )}
     </div>

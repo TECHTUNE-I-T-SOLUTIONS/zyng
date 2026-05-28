@@ -61,6 +61,7 @@ export default function RoomClient({ roomId }: { roomId: string }) {
 
   const messages = Array.isArray(room.zing_messages) ? room.zing_messages.slice().sort((a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()) : [];
   const members = Array.isArray(room.zing_room_members) ? room.zing_room_members : [];
+  const creatorPersona = room.creator?.personas?.find((persona: any) => persona.is_active) || room.creator?.personas?.[0];
 
   return (
     <div className="flex h-[calc(100vh-80px)] overflow-hidden bg-background">
@@ -74,9 +75,20 @@ export default function RoomClient({ roomId }: { roomId: string }) {
             <div>
               <h2 className="text-xl font-black truncate">{room.name}</h2>
               <div className="text-xs text-foreground/50 truncate max-w-sm">{room.description || 'Welcome to the room'}</div>
+              <div className="mt-1 text-[10px] uppercase tracking-widest text-foreground/30 font-black flex items-center gap-2">
+                Created by
+                <img
+                  src={creatorPersona?.avatar_url || room.creator?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${creatorPersona?.name || room.creator?.z_name || 'creator'}`}
+                  alt={creatorPersona?.name || room.creator?.z_name || 'Creator'}
+                  className="w-4 h-4 rounded-full object-cover bg-muted"
+                />
+                <span className="text-foreground/60 normal-case tracking-normal font-bold">
+                  {creatorPersona?.name || room.creator?.z_name || 'Creator'}
+                </span>
+              </div>
             </div>
           </div>
-          <button onClick={() => setShowSidebar(!showSidebar)} className="md:hidden p-2 bg-muted rounded-xl hover:text-accent transition">
+          <button title="Toggle room details" aria-label="Toggle room details" onClick={() => setShowSidebar(!showSidebar)} className="md:hidden p-2 bg-muted rounded-xl hover:text-accent transition">
             <Info size={20} />
           </button>
         </header>

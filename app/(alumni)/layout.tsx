@@ -1,19 +1,30 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { userService } from '@/lib/services/userService';
-import { GraduationCap, Briefcase, Globe, MessageCircle, Settings, LogOut, ChevronRight, Search, Bell } from 'lucide-react';
+import { GraduationCap, Briefcase, Globe, MessageCircle, Settings, LogOut, ChevronRight, Search, Bell, Users } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { getPersonaDisplay, graduationHasPassed } from '@/lib/persona-utils';
 
 export default function AlumniLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const { data: user } = useQuery({ queryKey: ['alumni-me'], queryFn: () => userService.getCurrentUser() });
+  const personaDisplay = getPersonaDisplay(user);
+
+  useEffect(() => {
+    if (user?.status === 'regular' && !graduationHasPassed(user.graduation_date)) {
+      router.replace(pathname?.replace(/^\/z-alumni\//, '/z-') || '/z-feed');
+    }
+  }, [pathname, router, user]);
 
   const navItems = [
+    { name: 'Connect', href: '/z-alumni/connect', icon: Users },
     { name: 'Global Feed', href: '/z-alumni/feed', icon: Globe },
     { name: 'Opportunities', href: '/z-alumni/jobs', icon: Briefcase },
     { name: 'Zing', href: '/z-alumni/messages', icon: MessageCircle },
@@ -30,7 +41,9 @@ export default function AlumniLayout({ children }: { children: React.ReactNode }
             </div>
             <div>
               <h1 className="text-xl font-black tracking-tighter text-indigo-400">ZYNG ALUMNI</h1>
-              <div className="text-[10px] font-black text-white/40 uppercase tracking-widest">Professional Mode</div>
+              <div className="mt-1 inline-flex items-center gap-2 rounded-full border border-indigo-500/20 bg-indigo-500/10 px-2 py-1 text-[10px] font-black uppercase tracking-widest text-indigo-300">
+                <span className="w-1.5 h-1.5 rounded-full bg-indigo-400" /> Alumni badge
+              </div>
             </div>
           </div>
 
@@ -79,15 +92,18 @@ export default function AlumniLayout({ children }: { children: React.ReactNode }
           </div>
 
           <div className="flex items-center gap-6">
-            <button className="p-2 text-white/40 hover:text-white transition-colors relative">
+            <button title="Notifications" aria-label="Notifications" className="p-2 text-white/40 hover:text-white transition-colors relative">
               <Bell size={20} />
               <div className="absolute top-2 right-2 w-2 h-2 bg-indigo-500 rounded-full" />
             </button>
-            <button className="p-2 text-white/40 hover:text-white transition-colors">
+            <button title="Settings" aria-label="Settings" className="p-2 text-white/40 hover:text-white transition-colors">
               <Settings size={20} />
             </button>
             <div className="w-10 h-10 rounded-full bg-white/10 border border-white/10 ml-4 flex items-center justify-center text-xs font-black">
-              {user?.z_name?.slice(0, 1)?.toUpperCase() || 'A'}
+              {personaDisplay.name?.slice(0, 1)?.toUpperCase() || 'A'}
+            </div>
+            <div className="hidden sm:inline-flex items-center gap-2 rounded-full border border-indigo-500/20 bg-indigo-500/10 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-indigo-300">
+              Alumni
             </div>
           </div>
         </header>

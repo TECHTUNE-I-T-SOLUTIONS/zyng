@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/db/supabase';
+import { onlyActivePersonaOwners } from '@/lib/persona-utils';
 
 // Extract hashtags from a text blob (e.g., post content) using `#tag` syntax.
 function extractHashtagsFromText(text?: string | null) {
@@ -38,7 +39,7 @@ export const postService = {
 
     const { data, error } = await query;
     if (error) throw error;
-    return data;
+    return onlyActivePersonaOwners(data || []);
   },
 
   async getPostById(id: string) {
@@ -49,6 +50,7 @@ export const postService = {
       .single();
 
     if (error) throw error;
+    if (!data?.persona?.is_active) return null;
     return data;
   },
 
@@ -82,7 +84,7 @@ export const postService = {
       .single();
 
     if (error) throw error;
-    return data;
+    return onlyActivePersonaOwners(data || []);
   },
 
   async reactToPost(postId: string, userId: string, type: string) {

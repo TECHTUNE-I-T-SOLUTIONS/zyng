@@ -11,6 +11,7 @@ import { postService } from '@/lib/services/postService';
 // personas are included on the user object when available from the server fallback
 import { useRef } from 'react';
 import { useToast } from '@/components/toast';
+import { ACTIVE_PERSONA_ALERT, getActivePersona } from '@/lib/persona-utils';
 
 type PostType = 'regular' | 'confession' | 'poll' | 'hot_take' | 'missed_connection';
 
@@ -36,6 +37,7 @@ export default function ZCreate() {
 
   const { data: user, isLoading: userLoading } = useQuery({ queryKey: ['me'], queryFn: () => userService.getCurrentUser() });
   const personas = (user as any)?.personas || [];
+  const activePersona = getActivePersona(personas);
 
   const types = [
     { id: 'regular', name: 'Zyng', icon: MessageSquare, color: 'text-red-300' },
@@ -53,8 +55,12 @@ export default function ZCreate() {
       show('Please enter some content for your Zyng.', 'error');
       return;
     }
-    if (!user?.id || !personas?.[0]?.id || !user.school_id) {
-      show('Unable to identify your persona or school. Please try again.', 'error');
+    if (!activePersona?.id) {
+      show(ACTIVE_PERSONA_ALERT, 'error');
+      return;
+    }
+    if (!user?.id || !user.school_id) {
+      show('Unable to identify your school. Please try again.', 'error');
       return;
     }
 
@@ -99,7 +105,7 @@ export default function ZCreate() {
 
       await postService.createPost({
         user_id: user.id,
-        persona_id: personas[0].id,
+        persona_id: activePersona.id,
         school_id: user.school_id,
         type: activeType,
         content,
@@ -257,8 +263,8 @@ export default function ZCreate() {
               <span className="text-[10px] font-black uppercase tracking-widest flex items-center gap-2">
                 Posting as
                 <span className="p-1 px-2 bg-accent/10 rounded border border-accent/20 flex items-center gap-2">
-                  <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${personas?.[0]?.name || 'anonymous'}`} alt="avatar" className="w-4 h-4 rounded-full" />
-                  {personas?.[0]?.name || 'No Persona Found (Create one in Profile)'}
+                  <img src={activePersona?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${activePersona?.name || 'anonymous'}`} alt="avatar" className="w-4 h-4 rounded-full" />
+                  {activePersona?.name || 'No Active Persona'}
                 </span>
               </span>
             </div>

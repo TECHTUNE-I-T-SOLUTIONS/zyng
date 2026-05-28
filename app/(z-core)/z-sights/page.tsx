@@ -6,6 +6,7 @@ import { motion } from 'framer-motion';
 import { Lightbulb, Plus, Eye, Code, Globe, Loader2, Search } from 'lucide-react';
 import Link from 'next/link';
 import { useState } from 'react';
+import { slugify } from '@/lib/utils';
 
 export default function ZSightsPage() {
   const [search, setSearch] = useState('');
@@ -14,6 +15,12 @@ export default function ZSightsPage() {
     queryKey: ['sights'],
     queryFn: () => sightService.getSights(),
   });
+
+  const getPersonaDisplay = (author: any) => {
+    const activePersona = author?.personas?.find((persona: any) => persona.is_active);
+    const fallbackPersona = author?.personas?.[0];
+    return activePersona || fallbackPersona || null;
+  };
 
   const filtered = sights?.filter((s: any) => 
     s.title.toLowerCase().includes(search.toLowerCase()) || 
@@ -95,8 +102,8 @@ export default function ZSightsPage() {
 
                   <div className="flex items-center justify-between pt-4 border-t border-border/50">
                     <div className="flex items-center gap-2">
-                      <img src={sight.author?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${sight.author?.z_name || 'anon'}`} alt="" className="w-6 h-6 rounded-full bg-muted" />
-                      <span className="text-[10px] font-black uppercase text-foreground/60 tracking-widest">@{sight.author?.z_name || 'Anonymous'}</span>
+                      <img src={getPersonaDisplay(sight.author)?.avatar_url || sight.author?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${getPersonaDisplay(sight.author)?.name || sight.author?.z_name || 'anon'}`} alt="" className="w-6 h-6 rounded-full bg-muted object-cover" />
+                      <span className="text-[10px] font-black uppercase text-foreground/60 tracking-widest">{getPersonaDisplay(sight.author)?.name || sight.author?.z_name || 'Anonymous'}</span>
                     </div>
                     
                     <div className="flex items-center gap-1">
@@ -105,7 +112,7 @@ export default function ZSightsPage() {
                     </div>
                   </div>
 
-                  <Link href={`/z-sights/${sight.id}`} className="absolute inset-0 z-10">
+                  <Link href={`/z-sights/${slugify(`${sight.title}-${sight.id}`)}`} className="absolute inset-0 z-10">
                     <span className="sr-only">View {sight.title}</span>
                   </Link>
                 </div>

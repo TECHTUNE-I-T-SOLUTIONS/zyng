@@ -1,22 +1,24 @@
 import { supabase } from '../db/supabase';
+import { hasActivePersona } from '@/lib/persona-utils';
 
 export const sightService = {
   async getSights() {
     const { data, error } = await supabase
       .from('zync_projects')
-      .select('*, author:users!user_id(id, z_name, avatar_url)')
+      .select('*, author:users!user_id(id, z_name, avatar_url, personas(id, name, avatar_url, is_active))')
       .order('created_at', { ascending: false });
     if (error) throw error;
-    return data || [];
+    return (data || []).filter((sight: any) => hasActivePersona(sight.author));
   },
 
   async getSightById(id: string) {
     const { data, error } = await supabase
       .from('zync_projects')
-      .select('*, author:users!user_id(id, z_name, avatar_url)')
+      .select('*, author:users!user_id(id, z_name, avatar_url, personas(id, name, avatar_url, is_active))')
       .eq('id', id)
       .single();
     if (error) throw error;
+    if (!hasActivePersona((data as any)?.author)) return null;
     return data;
   },
 
@@ -48,8 +50,8 @@ export const sightService = {
     user_id: string;
   }) {
     const request = payload.id
-      ? supabase.from('zync_projects').update(payload).eq('id', payload.id).select('*, author:users!user_id(id, z_name, avatar_url)').single()
-      : supabase.from('zync_projects').insert(payload).select('*, author:users!user_id(id, z_name, avatar_url)').single();
+      ? supabase.from('zync_projects').update(payload).eq('id', payload.id).select('*, author:users!user_id(id, z_name, avatar_url, personas(id, name, avatar_url, is_active))').single()
+      : supabase.from('zync_projects').insert(payload).select('*, author:users!user_id(id, z_name, avatar_url, personas(id, name, avatar_url, is_active))').single();
 
     const { data, error } = await request;
     if (error) throw error;
@@ -65,11 +67,11 @@ export const sightService = {
   async getComments(zyncId: string) {
     const { data, error } = await supabase
       .from('zync_comments')
-      .select('*, user:users!user_id(id, z_name, avatar_url)')
+      .select('*, user:users!user_id(id, z_name, avatar_url, personas(id, name, avatar_url, is_active))')
       .eq('zync_id', zyncId)
       .order('created_at', { ascending: true });
     if (error) throw error;
-    return data || [];
+    return (data || []).filter((comment: any) => hasActivePersona(comment.user));
   },
 
   async addComment(zyncId: string, userId: string, content: string) {
@@ -114,4 +116,3 @@ export const sightService = {
     return data || [];
   }
 };
-

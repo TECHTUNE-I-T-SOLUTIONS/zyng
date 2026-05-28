@@ -4,10 +4,16 @@ import { motion } from 'framer-motion';
 
 export default function PrivacyPage() {
   const sections = [
-    { title: "Data Collection", content: "We collect minimal data to function: phone number for authentication and campus ID for feed scoping. We do NOT collect real names or home addresses." },
-    { title: "Identity Security", content: "Your personas are logically isolated in our database. We do not associate your public activity with your phone number in any user-accessible interface." },
-    { title: "Data Retention", content: "Zyng content is designed to be short-lived. Expiring posts are permanently purged from our primary database after their timer runs out." },
-    { title: "Third Parties", content: "We do not sell data to advertisers. We use security services to protect against bots and DDoS attacks." }
+    { title: 'Information we collect', content: 'We collect account details that are needed to create and secure a Zyng account, including phone number or email for sign-in, school affiliation, faculty, department, graduation status, profile fields, personas, posts, messages, and activity required for moderation and service delivery.' },
+    { title: 'School and community context', content: 'Zyng is built around higher education communities. A school can be a university, polytechnic, college, institute, academy, or other recognized place of higher learning. We use school, faculty, and department information to place people in the right campus or alumni context.' },
+    { title: 'How we use information', content: 'We use data to authenticate users, scope feeds to the correct user, campus or alumni community, power rooms and direct messages, support matchmaking, keep trust and moderation systems working, and respond to support requests.' },
+    { title: 'Sharing and access', content: 'Public activity is shown to the people who are meant to see it inside Zyng. We do not sell personal data to advertisers. Limited service providers may process data on our behalf to host the app, deliver email, or support security operations.' },
+    { title: 'Personas and profile visibility', content: 'Zyng is persona-first. In most social surfaces, active personas are shown instead of account usernames. If a public persona is not available, Zyng may use a masked display name so the platform can remain understandable without exposing more profile information than needed.' },
+    { title: 'Messages and sensitive reports', content: 'Messages, requests, matches, contact requests, and feedback submissions may be reviewed when needed for support, safety, abuse prevention, or legal compliance. Safety reports should include enough detail for the team to investigate without sharing unnecessary private information.' },
+    { title: 'Retention and deletion', content: 'We keep account and content records for as long as they are needed to operate the platform, enforce rules, resolve disputes, or comply with legal obligations. Where deletion is supported, we remove data from active use and retain only what is required by law or operational need.' },
+    { title: 'Security controls', content: 'Zyng uses authentication, access restrictions, and moderation tooling to reduce unauthorized access and abuse. No online service is perfectly secure, so users should protect their credentials and report suspicious activity quickly.' },
+    { title: 'Your choices', content: 'You can update profile information, manage personas, and contact support to request help with account access, privacy concerns, or content review. School administrators and alumni moderators may also have limited visibility needed for safety and operations.' },
+    { title: 'Graduation and alumni transition', content: 'When graduation information shows that a user has completed school, Zyng may transition that account into alumni mode. This helps keep school identity, referrals, professional conversations, and alumni-only spaces connected to the same account.' }
   ];
 
   return (
@@ -22,7 +28,10 @@ export default function PrivacyPage() {
            <h1 className="text-5xl md:text-7xl font-black italic tracking-tighter uppercase">
              PRIVACY <span className="text-accent underline decoration-accent/30 underline-offset-8">POLICY.</span>
            </h1>
-           <p className="opacity-40 font-bold uppercase tracking-[0.2em] text-xs pt-4 text-accent">Your identity is your business. Keeping it that way is ours.</p>
+           <p className="opacity-40 font-bold uppercase tracking-[0.2em] text-xs pt-4 text-accent">Last updated: May 2026</p>
+           <p className="opacity-70 text-sm max-w-2xl mx-auto leading-relaxed">
+             This summary explains how Zyng handles information across students, graduates, and alumni communities from universities, polytechnics, colleges, and other higher schools.
+           </p>
         </motion.div>
 
         <div className="space-y-12">
@@ -43,6 +52,10 @@ export default function PrivacyPage() {
               </p>
             </motion.div>
           ))}
+        </div>
+
+        <div className="text-center text-xs text-foreground/40 leading-relaxed max-w-2xl mx-auto">
+          Questions about privacy, access, or deletion can be sent through the contact page. When a school or alumni community has additional policy requirements, those rules may apply alongside this page.
         </div>
       </div>
     </div>

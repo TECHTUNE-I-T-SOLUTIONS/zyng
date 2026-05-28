@@ -1,4 +1,5 @@
 import RoomClient from './RoomClient';
+import { extractIdFromSlug } from '@/lib/utils';
 
 type Props = { params: { id: string } };
 
@@ -6,6 +7,6 @@ export default async function RoomPage(props: Props) {
   // params may be a Promise in some runtimes — unwrap safely
   // eslint-disable-next-line @typescript-eslint/await-thenable
   const params = await (props.params as unknown as Promise<{ id: string }>);
-  const id = params?.id;
+  const id = extractIdFromSlug(params?.id || '');
   return <RoomClient roomId={id} />;
 }

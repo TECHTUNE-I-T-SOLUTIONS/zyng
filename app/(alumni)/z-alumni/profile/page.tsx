@@ -16,7 +16,7 @@ export default function AlumniProfilePage() {
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
-    window.location.href = '/login';
+    window.location.href = '/in/login';
   };
 
   if (isLoading) return <div className="flex justify-center py-20"><Loader2 className="animate-spin text-indigo-500" /></div>;
@@ -31,7 +31,7 @@ export default function AlumniProfilePage() {
             </div>
             <h1 className="text-4xl font-black tracking-tighter uppercase italic text-white">Alumni Identity</h1>
           </div>
-          <button className="p-3 bg-white/5 border border-white/10 rounded-xl hover:bg-white/10 transition-all">
+          <button title="Profile settings" aria-label="Profile settings" className="p-3 bg-white/5 border border-white/10 rounded-xl hover:bg-white/10 transition-all">
             <Settings size={20} />
           </button>
         </header>

@@ -4,7 +4,7 @@ export const referralService = {
   async getMyReferral(userId: string) {
     const { data, error } = await supabase
       .from('referrals')
-      .select('*, referrer:users!referrals_referrer_id_fkey(z_name, full_name), referred:users!referrals_referred_user_id_fkey(z_name, full_name)')
+      .select('*, referrer:users!referrals_referrer_id_fkey(z_name, full_name, avatar_url, personas(id, name, avatar_url, is_active)), referred:users!referrals_referred_user_id_fkey(z_name, full_name, avatar_url, personas(id, name, avatar_url, is_active))')
       .eq('referrer_id', userId)
       .order('created_at', { ascending: false });
 

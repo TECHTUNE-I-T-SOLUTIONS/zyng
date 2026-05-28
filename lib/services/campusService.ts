@@ -19,6 +19,17 @@ export const campusService = {
     return data;
   },
 
+  async getEventById(id: string) {
+    const { data, error } = await supabase
+      .from('zing_events')
+      .select('*, creator:created_by(id, z_name, avatar_url)')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (error) throw error;
+    return data;
+  },
+
   // Marketplace
   async getMarketplaceItems(schoolId?: string, category?: string) {
     let query = supabase.from('zing_marketplace').select('*').eq('is_sold', false);

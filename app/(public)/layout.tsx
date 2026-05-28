@@ -7,6 +7,8 @@ import { ThemeToggle } from '@/components/theme-toggle';
 import { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import Footer from '@/components/public/footer';
+import { useQuery } from '@tanstack/react-query';
+import { userService } from '@/lib/services/userService';
 
 const publicNav = [
   { name: 'Features', href: '/features' },
@@ -24,6 +26,11 @@ const publicNav = [
 export default function PublicLayout({ children }: { children: React.ReactNode }) {
   const { scrollY } = useScroll();
   const [isScrolled, setIsScrolled] = useState(false);
+  const { data: user } = useQuery({
+    queryKey: ['public-layout-me'],
+    queryFn: () => userService.getCurrentUser(),
+  });
+  const dashboardHref = user?.status === 'alumni' ? '/z-alumni/feed' : '/z-feed';
 
   useEffect(() => {
     return scrollY.on('change', (latest) => {
@@ -73,10 +80,10 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
               Login
             </Link>
             <Link
-              href="/in/signup"
+              href={user ? dashboardHref : '/in/signup'}
               className="text-xs font-black uppercase tracking-widest px-6 py-2.5 bg-accent text-black rounded-full shadow-lg shadow-accent/20 hover:scale-105 transition-all text-center"
             >
-              Join
+              {user ? 'Zyng' : 'Join'}
             </Link>
             <div className="md:hidden ml-1">
               <ThemeToggle />

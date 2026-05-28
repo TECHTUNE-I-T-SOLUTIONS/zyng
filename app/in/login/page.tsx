@@ -8,16 +8,20 @@ import Link from 'next/link';
 import { supabase } from '@/lib/db/supabase';
 
 
-// Normalize phone number for consistent DB lookup
-function normalizePhone(phone: string) {
-  // Remove spaces, dashes, parentheses
-  let normalized = phone.replace(/[\s()-]/g, '');
-  // Ensure it starts with +
-  if (!normalized.startsWith('+')) {
-    // Optionally, add your country code here if you want to enforce it
-    normalized = '+234' + normalized; // Uncomment for Nigeria default
+function getPhoneCandidates(phone: string) {
+  const trimmed = phone.trim();
+  const compact = trimmed.replace(/[\s()-]/g, '');
+  const digits = trimmed.replace(/\D/g, '');
+  const candidates = new Set<string>([trimmed, compact, compact.replace(/^\+/, ''), digits]);
+
+  if (digits.startsWith('0') && digits.length > 1) {
+    candidates.add(`+234${digits.slice(1)}`);
   }
-  return normalized;
+  if (!compact.startsWith('+') && compact) {
+    candidates.add(`+${compact}`);
+  }
+
+  return Array.from(candidates).filter(Boolean);
 }
 
 
@@ -50,15 +54,29 @@ export default function LoginPage() {
     setError('');
     try {
 
-      const normalizedPhone = normalizePhone(phoneNumber);
-      const { data: userRecord, error: lookupError } = await supabase
-        .from('users')
-        .select('email, status')
-        .eq('phone', normalizedPhone)
-        .single();
+      const phoneCandidates = getPhoneCandidates(phoneNumber);
+      let userRecord: { email: string; status: string | null } | null = null;
+      let lookupError: Error | null = null;
 
-      if (lookupError) throw lookupError;
-      if (!userRecord?.email) throw new Error('No account email found for that phone number.');
+      for (const candidate of phoneCandidates) {
+        const { data, error } = await supabase
+          .from('users')
+          .select('email, status')
+          .eq('phone', candidate)
+          .maybeSingle();
+
+        if (error) {
+          lookupError = error;
+          continue;
+        }
+
+        if (data?.email) {
+          userRecord = data;
+          break;
+        }
+      }
+
+      if (!userRecord?.email) throw lookupError || new Error('No account found for that phone number.');
 
       const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
         email: userRecord.email,
@@ -80,7 +98,15 @@ export default function LoginPage() {
         console.warn('failed to mint server auth cookie', err);
       }
 
-      router.push(userRecord.status === 'alumni' ? '/z-alumni/dashboard' : '/z-feed');
+      const { data: profile, error: profileError } = await supabase
+        .from('users')
+        .select('status')
+        .eq('id', authData.user.id)
+        .single();
+
+      if (profileError) throw profileError;
+
+      router.push(profile?.status === 'alumni' ? '/z-alumni/dashboard' : '/z-feed');
     } catch (err: any) {
       setError(err.message || 'Sign in failed');
     } finally {
@@ -186,11 +212,12 @@ function getPasswordStrength(password: string) {
 function PasswordStrengthBar({ strength }: { strength: number }) {
   const label = strength <= 1 ? 'Weak' : strength <= 3 ? 'Fair' : 'Strong';
   const color = strength <= 1 ? 'bg-red-500' : strength <= 3 ? 'bg-amber-500' : 'bg-green-500';
+  const widthClass = strength <= 1 ? 'w-[20%]' : strength <= 2 ? 'w-[40%]' : strength <= 3 ? 'w-[60%]' : strength <= 4 ? 'w-[80%]' : 'w-full';
 
   return (
     <div className="space-y-1">
       <div className="h-1.5 w-full rounded-full bg-border overflow-hidden">
-        <div className={`h-full ${color}`} style={{ width: `${Math.min(100, strength * 20)}%` }} />
+        <div className={`h-full ${color} ${widthClass}`} />
       </div>
       <div className="text-[11px] text-foreground/40">{label} password</div>
     </div>

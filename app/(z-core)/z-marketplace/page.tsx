@@ -9,6 +9,7 @@ import { motion } from 'framer-motion';
 import { ShoppingBag, Search, Plus, Loader2, X, Image as ImageIcon, MessageCircle, Eye } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { slugify } from '@/lib/utils';
 
 const CATEGORIES = ['All', 'Gadgets', 'Books', 'Furniture', 'Electronics', 'Clothing', 'Services', 'Vehicles'];
 const ITEM_CATEGORIES = CATEGORIES.filter(c => c !== 'All');
@@ -122,8 +123,8 @@ export default function MarketplacePage() {
     if (!user) return alert("Please login to contact seller.");
     if (user.id === sellerId) return alert("This is your own item.");
     try {
-      await zingService.sendZingRequest(sellerId, `Hi, is "${itemTitle}" still available?`);
-      router.push('/z-messages');
+      const chat = await zingService.sendZingRequest(sellerId, `Hi, is "${itemTitle}" still available?`);
+      router.push(`/z-messages?userId=${sellerId}&chatId=${chat.id}`);
     } catch (err) {
       console.error(err);
       alert("Failed to start conversation.");
@@ -216,7 +217,7 @@ export default function MarketplacePage() {
                       <MessageCircle size={14} /> Contact Seller
                     </button>
                     <Link 
-                      href={`/z-marketplace/${item.id}`} // using id as slug for now
+                      href={`/z-marketplace/${slugify(`${item.title}-${item.id}`)}`}
                       className="w-full py-2 bg-transparent border border-border rounded-xl text-xs font-black text-center uppercase flex items-center justify-center gap-2 hover:bg-muted transition-all text-foreground/70"
                     >
                       <Eye size={14} /> View Details
@@ -236,7 +237,7 @@ export default function MarketplacePage() {
           <div className="relative w-full max-w-2xl bg-background border border-border p-6 md:p-8 rounded-[2rem] z-10 max-h-[90vh] overflow-y-auto shadow-2xl">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-2xl font-black uppercase tracking-tighter">List an Item</h2>
-              <button onClick={() => setShowSellModal(false)} className="p-2 bg-muted rounded-xl hover:bg-muted/80"><X size={20}/></button>
+              <button title="Close modal" aria-label="Close modal" onClick={() => setShowSellModal(false)} className="p-2 bg-muted rounded-xl hover:bg-muted/80"><X size={20}/></button>
             </div>
 
             {errorMsg && (
@@ -248,11 +249,11 @@ export default function MarketplacePage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2 md:col-span-2">
                 <label className="text-[10px] font-black uppercase text-foreground/40 tracking-widest">Images (Max 2MB total)</label>
-                <div className="bg-muted border border-border border-dashed rounded-2xl p-6 flex flex-col items-center justify-center cursor-pointer hover:bg-muted/80 transition" onClick={() => fileRef.current?.click()}>
+                 <div className="bg-muted border border-border border-dashed rounded-2xl p-6 flex flex-col items-center justify-center cursor-pointer hover:bg-muted/80 transition" onClick={() => fileRef.current?.click()}>
                    <ImageIcon size={32} className="text-foreground/20 mb-2" />
                    <span className="text-sm font-bold">Click to add images</span>
                 </div>
-                <input ref={fileRef} type="file" accept="image/*" multiple onChange={handleImageChange} className="hidden" />
+                 <input ref={fileRef} title="Upload item images" aria-label="Upload item images" type="file" accept="image/*" multiple onChange={handleImageChange} className="hidden" />
                 
                 {imagePreviews.length > 0 && (
                   <div className="flex gap-2 flex-wrap mt-4">
@@ -260,6 +261,8 @@ export default function MarketplacePage() {
                       <div key={i} className="relative w-20 h-20 rounded-xl overflow-hidden border border-border group">
                         <img src={src} alt="Preview" className="w-full h-full object-cover" />
                         <button 
+                          title="Remove image"
+                          aria-label="Remove image"
                           onClick={(e) => { e.stopPropagation(); removeImage(i); }} 
                           className="absolute inset-0 bg-black/50 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
                         >
@@ -273,11 +276,11 @@ export default function MarketplacePage() {
 
               <div className="space-y-2 md:col-span-2">
                 <label className="text-[10px] font-black uppercase text-foreground/40 tracking-widest">Title</label>
-                <input value={title} onChange={(e) => setTitle(e.target.value)} className="w-full bg-muted border border-border rounded-2xl p-3 focus:border-accent outline-none" />
+                <input title="Item title" value={title} onChange={(e) => setTitle(e.target.value)} className="w-full bg-muted border border-border rounded-2xl p-3 focus:border-accent outline-none" placeholder="Enter item title" />
               </div>
               <div className="space-y-2">
                 <label className="text-[10px] font-black uppercase text-foreground/40 tracking-widest">Category</label>
-                <select value={itemCategory} onChange={(e) => setItemCategory(e.target.value)} className="w-full bg-muted border border-border rounded-2xl p-3 focus:border-accent outline-none appearance-none">
+                <select title="Item category" value={itemCategory} onChange={(e) => setItemCategory(e.target.value)} className="w-full bg-muted border border-border rounded-2xl p-3 focus:border-accent outline-none appearance-none">
                   {ITEM_CATEGORIES.map(cat => (
                     <option key={cat} value={cat}>{cat}</option>
                   ))}
@@ -289,7 +292,7 @@ export default function MarketplacePage() {
               </div>
               <div className="space-y-2 md:col-span-2">
                 <label className="text-[10px] font-black uppercase text-foreground/40 tracking-widest">Description</label>
-                <textarea value={description} onChange={(e) => setDescription(e.target.value)} className="w-full bg-muted border border-border rounded-2xl p-3 h-32 focus:border-accent outline-none" />
+                <textarea title="Item description" value={description} onChange={(e) => setDescription(e.target.value)} className="w-full bg-muted border border-border rounded-2xl p-3 h-32 focus:border-accent outline-none" placeholder="Describe the item" />
               </div>
             </div>
 

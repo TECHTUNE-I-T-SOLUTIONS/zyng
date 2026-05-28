@@ -6,20 +6,48 @@ import { ChevronDown } from 'lucide-react';
 
 const faqs = [
   {
-    q: 'How does the Persona system actually work?',
-    a: 'When you sign up, you provide your student ID or email, which we securely verify. But when you post, you use a Persona—an isolated profile that isn\'t publicly linked to your real identity. You can create multiple personas to express different sides of yourself on campus.',
+    q: 'What is Zyng?',
+    a: 'Zyng is a school-based social and professional network that combines posting, direct messaging, rooms, marketplace listings, jobs, events, referrals, and alumni networking.',
   },
   {
-    q: 'Is my data geofenced to my campus?',
-    a: 'Yes. Every post, confession, and missed connection is strictly locked to your university. You will never see posts from other colleges in your main feed, ensuring everything is 100% relevant to you.',
+    q: 'Who can join Zyng?',
+    a: 'Anyone connected to a higher school can belong on Zyng. That includes universities, polytechnics, colleges, institutes, academies, and similar schools. You can be a current student, a recent graduate, a long-time alumni, or an approved member of that school community.',
   },
   {
-    q: 'How do Alumni transitions work?',
-    a: 'When you graduate, your student account naturally transitions. You can choose to verify your alumni status, which unlocks access to the Global Alumni network, professional mentorship, and career opportunities.',
+    q: 'What if my school is not a university?',
+    a: 'That is fine. Zyng is not only for universities. The important thing is that the community has a real school structure, usually with a school name, faculty or division, department or program, and a student or alumni relationship.',
   },
   {
-    q: 'How does the Trust Score work?',
-    a: 'Zyng relies on a community-moderation system. High-quality posts and positive interactions increase your Trust Score. Toxicity or spam lowers it, eventually limiting a persona\'s ability to post.',
+    q: 'How do personas work?',
+    a: 'A persona is the public identity you use inside Zyng. You can create more than one persona, choose an active one, and use that profile for posts and interactions while keeping your account credentials private.',
+  },
+  {
+    q: 'What happens when a user who is a student becomes an alumnus?',
+    a: 'Alumni accounts keep access to the alumni network and the pro tools that belong there. The student profile does not disappear; it transitions into the alumni experience so connections, referrals, and professional conversations remain organized.',
+  },
+  {
+    q: 'Who can I see in my feed?',
+    a: 'You will see people and content scoped to the school or network you belong to. That includes fellow students, alumni, rooms tied to your campus, and alumni content when you are in the alumni area. Social surfaces prefer active personas over raw usernames.',
+  },
+  {
+    q: 'Why do I need an active persona?',
+    a: 'Active personas keep Zyng consistent and safer. Posts, messages, matches, rooms, events, jobs, marketplace activity, and referrals are easier to understand when people show a persona identity instead of exposing account usernames everywhere.',
+  },
+  {
+    q: 'Can older alumni use Zyng?',
+    a: 'Yes. Zyng is not limited to recent graduates. If someone attended a school years ago and can reasonably belong to that school community, they can use alumni features, connect with others, share opportunities, and participate in school-linked spaces.',
+  },
+  {
+    q: 'How are safety and moderation handled?',
+    a: 'We combine reporting tools, admin review, and trust signals to identify spam or harmful behavior. Messages and rooms are designed to support moderation while keeping the product usable for genuine campus communication.',
+  },
+  {
+    q: 'Can schools or departments be added?',
+    a: 'Yes. If a school, faculty, department, or program is missing, users can contact Zyng support with the correct details. This helps avoid duplicate or misleading school records.',
+  },
+  {
+    q: 'Can I get help if I have an account problem?',
+    a: 'Yes. Use the contact page to report account issues, ask for recovery help, or request assistance with a school or alumni profile. If the issue is urgent, send it directly to the support address listed there.',
   }
 ];
 
@@ -36,9 +64,9 @@ export default function FAQPage() {
       >
         <div className="text-center space-y-6">
           <h1 className="text-4xl md:text-6xl font-medium tracking-tight">
-            Got <span className="text-accent">questions?</span>
+            Common <span className="text-accent">questions.</span>
           </h1 >
-          <p className="opacity-60 text-sm">Everything you need to know about Zyng's platform and community rules.</p>
+          <p className="opacity-60 text-sm">A clear overview of how Zyng works for students, alumni, and campus partners.</p>
         </div>
 
         <motion.div 
