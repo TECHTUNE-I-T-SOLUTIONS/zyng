@@ -1,18 +1,19 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState, useRef, useEffect } from 'react';
 import { userService } from '@/lib/services/userService';
 import { campusService } from '@/lib/services/campusService';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { Calendar, MapPin, Clock, Ticket, Plus, Loader2, X, Image as ImageIcon } from 'lucide-react';
+import { Calendar, MapPin, Clock, Ticket, Plus, Loader2, X, Image as ImageIcon, MoreVertical, Pencil, Trash2, Share2 } from 'lucide-react';
 import { slugify } from '@/lib/utils';
 
 const CATEGORIES = ['General', 'Academic', 'Social', 'Sports', 'Career', 'Arts', 'Tech'];
 
 export default function EventsPage() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { data: events, isLoading } = useQuery({
     queryKey: ['events'],
     queryFn: () => campusService.getEvents(),
@@ -20,6 +21,8 @@ export default function EventsPage() {
 
   const { data: user } = useQuery({ queryKey: ['me'], queryFn: () => userService.getCurrentUser() });
   const [showPostModal, setShowPostModal] = useState(false);
+  const [editingEvent, setEditingEvent] = useState<any | null>(null);
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [startTime, setStartTime] = useState('');
@@ -38,11 +41,49 @@ export default function EventsPage() {
   const [posting, setPosting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
+  const resetEventForm = () => {
+    setTitle('');
+    setDescription('');
+    setStartTime('');
+    setEndTime('');
+    setLocation('');
+    setLocationSearch('');
+    setLocationSuggestions([]);
+    setCategory(CATEGORIES[0]);
+    setSelectedImages([]);
+    setImagePreviews([]);
+    setTags('');
+    setErrorMsg('');
+    setEditingEvent(null);
+  };
+
+  const openCreateModal = () => {
+    resetEventForm();
+    setShowPostModal(true);
+  };
+
+  const openEditModal = (event: any) => {
+    setEditingEvent(event);
+    setTitle(event.title || '');
+    setDescription(event.description || '');
+    setStartTime(event.start_time ? new Date(event.start_time).toISOString().slice(0, 16) : '');
+    setEndTime(event.end_time ? new Date(event.end_time).toISOString().slice(0, 16) : '');
+    setLocation(event.location || '');
+    setLocationSearch(event.location || '');
+    setCategory(event.category || CATEGORIES[0]);
+    setSelectedImages([]);
+    setImagePreviews(Array.isArray(event.images) ? event.images : event.cover_image ? [event.cover_image] : []);
+    setTags(Array.isArray(event.tags) ? event.tags.join(', ') : '');
+    setErrorMsg('');
+    setOpenMenuId(null);
+    setShowPostModal(true);
+  };
+
   // Location Debounce & Fetch
   useEffect(() => {
     if (!locationSearch || locationSearch === location) {
-      setLocationSuggestions([]);
-      return;
+      const timer = window.setTimeout(() => setLocationSuggestions([]), 0);
+      return () => window.clearTimeout(timer);
     }
     const delay = setTimeout(async () => {
       try {
@@ -116,26 +157,47 @@ export default function EventsPage() {
         if (res.ok && json.url) imageUrls.push(json.url);
       }
 
-      await campusService.createEvent({
+      const existingImages = editingEvent ? imagePreviews.filter((src) => src.startsWith('http')) : [];
+      const finalImages = [...existingImages, ...imageUrls];
+      const payload = {
         title: title.trim(),
         description: description || null,
         start_time: new Date(startTime).toISOString(),
         end_time: endTime ? new Date(endTime).toISOString() : null,
         location: location || null,
         category: category || null,
-        cover_image: imageUrls.length > 0 ? imageUrls[0] : null,
-        images: imageUrls.length > 0 ? imageUrls : null,
+        cover_image: finalImages.length > 0 ? finalImages[0] : null,
+        images: finalImages.length > 0 ? finalImages : null,
         tags: tags ? tags.split(',').map((t) => t.trim()).filter(Boolean) : null,
         created_by: user.id,
         school_id: user.school_id || null,
-      });
+      };
+      if (editingEvent) {
+        await campusService.updateEvent(editingEvent.id, payload);
+      } else {
+        await campusService.createEvent(payload);
+      }
       setShowPostModal(false);
-      window.location.reload();
+      resetEventForm();
+      queryClient.invalidateQueries({ queryKey: ['events'] });
     } catch (err) {
       console.error(err);
       setErrorMsg('Failed to post event');
     } finally {
       setPosting(false);
+    }
+  };
+
+  const shareEvent = async (event: any) => {
+    const url = `${window.location.origin}/z-events/${slugify(`${event.title}-${event.id}`)}`;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: event.title, text: event.description || 'Check out this event on Zyng.', url });
+        return;
+      }
+      await navigator.clipboard.writeText(url);
+    } catch {
+      await navigator.clipboard.writeText(url);
     }
   };
 
@@ -145,9 +207,9 @@ export default function EventsPage() {
         <header className="flex items-center justify-between mb-10">
           <div>
             <h1 className="text-4xl font-black tracking-tighter mb-2">CAMPUS EVENTS</h1>
-            <p className="text-foreground/40 font-medium italic">What's happening on campus today?</p>
+            <p className="text-foreground/40 font-medium italic">What&apos;s happening on campus today?</p>
           </div>
-          <button onClick={() => setShowPostModal(true)} className="bg-accent text-black px-6 py-3 rounded-2xl font-black flex items-center gap-2 hover:scale-105 transition-all">
+          <button onClick={openCreateModal} className="bg-accent text-black px-6 py-3 rounded-2xl font-black flex items-center gap-2 hover:scale-105 transition-all">
             <Plus size={20} />
             POST EVENT
           </button>
@@ -185,6 +247,41 @@ export default function EventsPage() {
                 )}
                 
                 <div className="p-8 flex-1 flex flex-col">
+                  <div className="relative ml-auto -mt-2 mb-2">
+                    <button
+                      type="button"
+                      aria-label="Event actions"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setOpenMenuId((current) => current === event.id ? null : event.id);
+                      }}
+                      className="rounded-xl border border-border bg-background p-2 text-foreground/50 hover:text-foreground"
+                    >
+                      <MoreVertical size={18} />
+                    </button>
+                    {openMenuId === event.id && (
+                      <div className="absolute right-0 top-11 z-20 w-36 rounded-xl border border-border bg-background p-2 shadow-xl">
+                        <button onClick={() => { shareEvent(event); setOpenMenuId(null); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-muted">
+                          <Share2 size={14} /> Share
+                        </button>
+                        {event.created_by === user?.id && (
+                          <>
+                            <button onClick={() => openEditModal(event)} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-muted">
+                              <Pencil size={14} /> Edit
+                            </button>
+                            <button onClick={async () => {
+                              if (!confirm('Delete this event?')) return;
+                              await campusService.deleteEvent(event.id);
+                              queryClient.invalidateQueries({ queryKey: ['events'] });
+                              setOpenMenuId(null);
+                            }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-red-500 hover:bg-red-500/10">
+                              <Trash2 size={14} /> Delete
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </div>
                   <div className="flex items-center gap-6 mb-4">
                     <div className="flex items-center gap-2 text-accent font-black text-sm">
                       <Calendar size={16} />
@@ -224,8 +321,8 @@ export default function EventsPage() {
           <div onClick={() => setShowPostModal(false)} className="absolute inset-0 bg-black/80 backdrop-blur-sm overflow-y-auto"></div>
           <div className="relative w-full max-w-2xl bg-background border border-border p-8 rounded-[2rem] z-10 my-auto max-h-[90vh] overflow-y-auto shadow-2xl">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-black uppercase tracking-tighter">Post Event</h2>
-              <button title="Close modal" aria-label="Close modal" onClick={() => setShowPostModal(false)} className="p-2 bg-muted rounded-xl hover:bg-muted/80"><X size={20}/></button>
+              <h2 className="text-2xl font-black uppercase tracking-tighter">{editingEvent ? 'Edit Event' : 'Post Event'}</h2>
+              <button title="Close modal" aria-label="Close modal" onClick={() => { setShowPostModal(false); resetEventForm(); }} className="p-2 bg-muted rounded-xl hover:bg-muted/80"><X size={20}/></button>
             </div>
 
             {errorMsg && (
@@ -251,7 +348,14 @@ export default function EventsPage() {
                         <button 
                           title="Remove image"
                           aria-label="Remove image"
-                          onClick={(e) => { e.stopPropagation(); removeImage(i); }} 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (src.startsWith('http')) {
+                              setImagePreviews((current) => current.filter((_, index) => index !== i));
+                              return;
+                            }
+                            removeImage(i);
+                          }} 
                           className="absolute inset-0 bg-black/50 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
                         >
                           <X size={16} />
@@ -324,7 +428,7 @@ export default function EventsPage() {
 
             <div className="mt-8 flex justify-end">
               <button disabled={posting} onClick={handlePostEvent} className="bg-accent text-black px-8 py-4 rounded-2xl font-black hover:scale-105 transition-all disabled:opacity-50 disabled:hover:scale-100 flex items-center gap-2">
-                {posting ? <><Loader2 size={18} className="animate-spin" /> POSTING...</> : 'PUBLISH EVENT'}
+                {posting ? <><Loader2 size={18} className="animate-spin" /> SAVING...</> : editingEvent ? 'SAVE EVENT' : 'PUBLISH EVENT'}
               </button>
             </div>
           </div>

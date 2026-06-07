@@ -33,10 +33,17 @@ type PortfolioEntry = {
   value: string;
 };
 
+type PortfolioSectionGroup = {
+  id: string;
+  title: string;
+  fields: PortfolioEntry[];
+};
+
 type PortfolioSection = {
   id: string;
   title: string;
   entries: PortfolioEntry[];
+  groups?: PortfolioSectionGroup[];
 };
 
 type PortfolioAttachment = {
@@ -51,6 +58,7 @@ type PortfolioProject = {
   title: string;
   description: string;
   category: string;
+  tags: string[];
   link: string;
   images: string[];
 };
@@ -124,6 +132,7 @@ const normalizeProject = (item: any, index: number): PortfolioProject | null => 
   const title = normalizeText(item.title ?? item.name ?? `Project ${index + 1}`);
   const description = normalizeText(item.description ?? item.summary ?? '');
   const category = normalizeText(item.category ?? '');
+  const tags = uniqueStrings(Array.isArray(item.tags) ? item.tags : []);
   const link = normalizeText(item.link ?? '');
   const images = Array.isArray(item.images) ? item.images.map((image: unknown) => normalizeText(image)).filter(Boolean) : [];
 
@@ -134,6 +143,7 @@ const normalizeProject = (item: any, index: number): PortfolioProject | null => 
     title: title || `Project ${index + 1}`,
     description,
     category,
+    tags,
     link,
     images,
   };
@@ -176,6 +186,11 @@ const normalizeSection = (item: any, index: number): PortfolioSection | null => 
       : Array.isArray(item.content)
         ? item.content
         : [];
+  const rawGroups = Array.isArray(item.groups)
+    ? item.groups
+    : Array.isArray(item.items) && item.items.some((group: any) => Array.isArray(group?.fields))
+      ? item.items
+      : [];
 
   return {
     id: normalizeText(item.id) || createId(`section-${index}`),
@@ -183,6 +198,15 @@ const normalizeSection = (item: any, index: number): PortfolioSection | null => 
     entries: rawEntries
       .map((entry: any, entryIndex: number) => normalizeEntry(entry, `Item ${entryIndex + 1}`, entryIndex))
       .filter(Boolean) as PortfolioEntry[],
+    groups: rawGroups
+      .map((group: any, groupIndex: number) => ({
+        id: normalizeText(group?.id) || createId(`section-group-${index}-${groupIndex}`),
+        title: normalizeText(group?.title ?? group?.name ?? `Item ${groupIndex + 1}`),
+        fields: (Array.isArray(group?.fields) ? group.fields : [])
+          .map((field: any, fieldIndex: number) => normalizeEntry(field, `Field ${fieldIndex + 1}`, fieldIndex))
+          .filter(Boolean) as PortfolioEntry[],
+      }))
+      .filter((group: PortfolioSectionGroup) => group.title || group.fields.length),
   };
 };
 
@@ -409,11 +433,20 @@ const renderPrintableHtml = (kind: 'portfolio' | 'resume', portfolio: PortfolioS
       const rows = section.entries
         .map((entry) => `<tr><td>${entry.label}</td><td>${entry.value}</td></tr>`)
         .join('');
+      const groups = (section.groups || [])
+        .map((group) => `
+          <div class="section-card">
+            <div class="section-card-title">${group.title}</div>
+            ${group.fields.length ? `<table>${group.fields.map((field) => `<tr><td>${field.label}</td><td>${field.value}</td></tr>`).join('')}</table>` : '<div class="muted">No fields added yet.</div>'}
+          </div>
+        `)
+        .join('');
 
       return `
         <div class="card">
           <div class="section-title">${section.title}</div>
-          ${rows ? `<table>${rows}</table>` : '<div class="muted">No items added yet.</div>'}
+          ${groups}
+          ${rows ? `<table>${rows}</table>` : groups ? '' : '<div class="muted">No items added yet.</div>'}
         </div>
       `;
     })
@@ -424,6 +457,7 @@ const renderPrintableHtml = (kind: 'portfolio' | 'resume', portfolio: PortfolioS
       <div class="card">
         <div class="section-title">${project.title}</div>
         ${project.category ? `<div class="muted" style="margin-bottom:8px;">${project.category}</div>` : ''}
+        ${project.tags?.length ? `<div style="margin-bottom:8px;">${project.tags.map((tag) => `<span class="pill">${tag}</span>`).join('')}</div>` : ''}
         ${project.description ? `<div class="summary">${project.description}</div>` : '<div class="muted">No description added yet.</div>'}
         ${project.link ? `<div style="margin-top:8px; font-size:12px;"><strong>Link:</strong> ${project.link}</div>` : ''}
       </div>
@@ -447,12 +481,23 @@ const renderPrintableHtml = (kind: 'portfolio' | 'resume', portfolio: PortfolioS
     const sectionItems = portfolio.sections.map((section) => `
       <div class="section-card">
         <div class="section-card-title">${section.title}</div>
+        ${(section.groups || []).map((group) => `
+          <div class="section-card">
+            <div class="section-card-title">${group.title}</div>
+            ${group.fields.length ? group.fields.map((field) => `
+              <div class="section-entry">
+                <div class="section-entry-label">${field.label || 'Field'}</div>
+                <div class="section-entry-value">${field.value || 'Value'}</div>
+              </div>
+            `).join('') : '<div class="muted">No fields added yet.</div>'}
+          </div>
+        `).join('')}
         ${section.entries.length ? section.entries.map((entry) => `
           <div class="section-entry">
             <div class="section-entry-label">${entry.label || 'Entry'}</div>
             <div class="section-entry-value">${entry.value || 'Value'}</div>
           </div>
-        `).join('') : '<div class="muted">No items added yet.</div>'}
+        `).join('') : (section.groups?.length ? '' : '<div class="muted">No items added yet.</div>')}
       </div>
     `).join('');
 
@@ -460,6 +505,7 @@ const renderPrintableHtml = (kind: 'portfolio' | 'resume', portfolio: PortfolioS
       <div class="project">
         <div class="project-title">${project.title}</div>
         ${project.category ? `<div class="project-meta">${project.category}</div>` : ''}
+        ${project.tags?.length ? `<div style="margin:6px 0;">${project.tags.map((tag) => `<span class="pill">${tag}</span>`).join('')}</div>` : ''}
         ${project.description ? `<div class="summary">${project.description}</div>` : '<div class="muted">No description added yet.</div>'}
         ${project.link ? `<div style="margin-top:8px; font-size:11px;"><strong>Link:</strong> ${project.link}</div>` : ''}
       </div>
@@ -980,8 +1026,15 @@ const normalizeSectionsForSave = (sections: PortfolioSection[]) => sections
     id: section.id,
     title: normalizeText(section.title) || 'Section',
     entries: normalizeEntriesForSave(section.entries),
+    groups: (section.groups || [])
+      .map((group) => ({
+        id: group.id,
+        title: normalizeText(group.title) || 'Item',
+        fields: normalizeEntriesForSave(group.fields),
+      }))
+      .filter((group) => group.title || group.fields.length),
   }))
-  .filter((section) => section.title || section.entries.length);
+  .filter((section) => section.title || section.entries.length || section.groups.length);
 
 export default function PortfolioBuilder() {
   const { show } = useToast();
@@ -997,8 +1050,10 @@ export default function PortfolioBuilder() {
   const [skillDraft, setSkillDraft] = useState('');
   const [sectionDraft, setSectionDraft] = useState('');
   const [projectDraft, setProjectDraft] = useState({ title: '', description: '', category: '', link: '', images: '' });
+  const [projectTagDrafts, setProjectTagDrafts] = useState<Record<string, string>>({});
   const [activeProjectImageId, setActiveProjectImageId] = useState<string | null>(null);
   const [projectImageUploading, setProjectImageUploading] = useState(false);
+  const [parsingAttachment, setParsingAttachment] = useState(false);
 
   const profileQuery = useQuery({
     queryKey: ['z-pro-portfolio-profile'],
@@ -1147,7 +1202,7 @@ export default function PortfolioBuilder() {
       if (!current) return current;
       return {
         ...current,
-        projects: [...current.projects, { id: createId('project'), title: '', description: '', category: '', link: '', images: [] }],
+        projects: [...current.projects, { id: createId('project'), title: '', description: '', category: '', tags: [], link: '', images: [] }],
       };
     });
   };
@@ -1159,6 +1214,53 @@ export default function PortfolioBuilder() {
         ...current,
         projects: current.projects.map((project) => (project.id === id ? { ...project, ...patch } : project)),
       };
+    });
+  };
+
+  const setProjectTagDraft = (projectId: string, value: string) => {
+    setProjectTagDrafts((current) => ({
+      ...current,
+      [projectId]: value,
+    }));
+  };
+
+  const addProjectTag = (projectId: string, rawValue?: string) => {
+    const tag = normalizeText(rawValue ?? projectTagDrafts[projectId]).replace(/^#/, '');
+    if (!tag) return;
+    updateProject(projectId, {
+      tags: uniqueStrings([
+        ...(portfolio?.projects.find((project) => project.id === projectId)?.tags || []),
+        tag,
+      ]),
+    });
+    setProjectTagDraft(projectId, '');
+  };
+
+  const handleProjectTagDraftChange = (projectId: string, value: string) => {
+    if (!value.includes(',')) {
+      setProjectTagDraft(projectId, value);
+      return;
+    }
+
+    const parts = value.split(',');
+    const completeTags = parts.slice(0, -1).map((tag) => tag.trim()).filter(Boolean);
+    const draft = parts.at(-1) || '';
+    const project = portfolio?.projects.find((item) => item.id === projectId);
+
+    updateProject(projectId, {
+      tags: uniqueStrings([
+        ...(project?.tags || []),
+        ...completeTags.map((tag) => tag.replace(/^#/, '')),
+      ]),
+    });
+    setProjectTagDraft(projectId, draft);
+  };
+
+  const removeProjectTag = (projectId: string, tag: string) => {
+    const project = portfolio?.projects.find((item) => item.id === projectId);
+    if (!project) return;
+    updateProject(projectId, {
+      tags: project.tags.filter((item) => item.toLowerCase() !== tag.toLowerCase()),
     });
   };
 
@@ -1249,6 +1351,11 @@ export default function PortfolioBuilder() {
         projects: current.projects.filter((project) => project.id !== id),
       };
     });
+    setProjectTagDrafts((current) => {
+      const next = { ...current };
+      delete next[id];
+      return next;
+    });
 
     if (user?.id && !String(id).startsWith('project-')) {
       try {
@@ -1268,6 +1375,7 @@ export default function PortfolioBuilder() {
       title: normalizeText(project.title) || 'Untitled project',
       description: normalizeText(project.description),
       category: normalizeText(project.category),
+      tags: uniqueStrings(project.tags || []),
       link: normalizeText(project.link),
       images: Array.isArray(project.images) ? project.images.filter(Boolean) : [],
     });
@@ -1309,12 +1417,81 @@ export default function PortfolioBuilder() {
     });
   };
 
+  const mergeParsedResume = (parsedPayload: any) => {
+    const parsed = parsedPayload?.parsed;
+    if (!parsed) return;
+
+    setPortfolio((current) => {
+      if (!current) return current;
+      const parsedEntries = (parsed.keyDetails || []).map((entry: any, index: number) => ({
+        id: createId(`resume-detail-${index}`),
+        label: normalizeText(entry.label),
+        value: normalizeText(entry.value),
+      })).filter((entry: PortfolioEntry) => entry.label && entry.value);
+
+      const parsedSections = (parsed.sections || []).map((section: any, sectionIndex: number) => ({
+        id: createId(`resume-section-${sectionIndex}`),
+        title: normalizeText(section.title) || `Resume Section ${sectionIndex + 1}`,
+        entries: (section.entries || []).map((entry: any, entryIndex: number) => ({
+          id: createId(`resume-section-${sectionIndex}-${entryIndex}`),
+          label: normalizeText(entry.label) || `Item ${entryIndex + 1}`,
+          value: normalizeText(entry.value),
+        })).filter((entry: PortfolioEntry) => entry.value),
+        groups: (section.groups || []).map((group: any, groupIndex: number) => ({
+          id: createId(`resume-section-${sectionIndex}-group-${groupIndex}`),
+          title: normalizeText(group.title) || `Item ${groupIndex + 1}`,
+          fields: (group.fields || []).map((field: any, fieldIndex: number) => ({
+            id: createId(`resume-section-${sectionIndex}-group-${groupIndex}-field-${fieldIndex}`),
+            label: normalizeText(field.label) || `Field ${fieldIndex + 1}`,
+            value: normalizeText(field.value),
+          })).filter((field: PortfolioEntry) => field.value),
+        })).filter((group: PortfolioSectionGroup) => group.title || group.fields.length),
+      })).filter((section: PortfolioSection) => section.entries.length || section.groups?.length);
+
+      const mergedSections = [...current.sections];
+      for (const parsedSection of parsedSections) {
+        const existingIndex = mergedSections.findIndex(
+          (section) => normalizeText(section.title).toLowerCase() === normalizeText(parsedSection.title).toLowerCase(),
+        );
+
+        if (existingIndex === -1) {
+          mergedSections.push(parsedSection);
+          continue;
+        }
+
+        mergedSections[existingIndex] = {
+          ...mergedSections[existingIndex],
+          entries: mergeEntries(mergedSections[existingIndex].entries, parsedSection.entries),
+          groups: [
+            ...(mergedSections[existingIndex].groups || []),
+            ...(parsedSection.groups || []),
+          ],
+        };
+      }
+
+      const parsedSummary = normalizeText(parsed.summary || '');
+      return {
+        ...current,
+        title: current.title || parsed.name || current.title,
+        summary: current.summary || parsedSummary,
+        skills: uniqueStrings([...current.skills, ...(Array.isArray(parsed.skills) ? parsed.skills : [])]),
+        entries: mergeEntries(current.entries, parsedEntries),
+        sections: mergedSections,
+      };
+    });
+  };
+
   const handleAttachFile = async (file: File) => {
     if (!portfolio) return;
+    const isResumeDocument = file.type === 'application/pdf'
+      || file.name.toLowerCase().endsWith('.pdf')
+      || file.type.includes('wordprocessingml')
+      || file.name.toLowerCase().endsWith('.docx');
     const reader = new FileReader();
     reader.onload = async () => {
       const dataUrl = reader.result as string;
       try {
+        if (isResumeDocument) setParsingAttachment(true);
         const response = await fetch('/api/uploads', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -1332,13 +1509,32 @@ export default function PortfolioBuilder() {
               ],
             };
           });
-          show('Attachment added to portfolio', 'success');
+          if (isResumeDocument) {
+            try {
+              const parseResponse = await fetch('/api/portfolio/parse-resume', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ filename: file.name, mime: file.type, dataUrl }),
+              });
+              const parsedJson = await parseResponse.json();
+              if (!parseResponse.ok) throw new Error(parsedJson?.error || 'Resume parsing failed');
+              mergeParsedResume(parsedJson);
+              show('Resume parsed and portfolio details updated', 'success');
+            } catch (parseError) {
+              console.error(parseError);
+              show('File attached, but Zyng could not extract resume details from it', 'error');
+            }
+          } else {
+            show('Attachment added to portfolio', 'success');
+          }
         } else {
           throw new Error(json?.error || 'Upload failed');
         }
       } catch (error) {
         console.error(error);
-        show('Attachment upload failed', 'error');
+        show(error instanceof Error ? error.message : 'Attachment upload failed', 'error');
+      } finally {
+        setParsingAttachment(false);
       }
     };
     reader.readAsDataURL(file);
@@ -1372,6 +1568,7 @@ export default function PortfolioBuilder() {
             title: normalizeText(project.title),
             description: normalizeText(project.description),
             category: normalizeText(project.category),
+            tags: uniqueStrings(project.tags || []),
             link: normalizeText(project.link),
             images: Array.isArray(project.images) ? project.images.filter(Boolean) : [],
           })),
@@ -1581,9 +1778,11 @@ export default function PortfolioBuilder() {
             <button
               type="button"
               onClick={() => fileRef.current?.click()}
-              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-border bg-background px-4 py-3 text-xs font-black uppercase tracking-widest transition-all hover:border-accent hover:text-accent"
+              disabled={parsingAttachment}
+              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-border bg-background px-4 py-3 text-xs font-black uppercase tracking-widest transition-all hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:opacity-60"
             >
-              <UploadCloud size={14} /> Attach file
+              {parsingAttachment ? <Loader2 size={14} className="animate-spin" /> : <UploadCloud size={14} />}
+              {parsingAttachment ? 'Reading file' : 'Attach file'}
             </button>
             <button
               type="button"
@@ -1609,7 +1808,7 @@ export default function PortfolioBuilder() {
         <input
           ref={fileRef}
           type="file"
-          accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,.webp"
+          accept=".pdf,.docx,.png,.jpg,.jpeg,.webp"
           className="hidden"
           title="Upload attachment"
           aria-label="Upload attachment"
@@ -1832,6 +2031,19 @@ export default function PortfolioBuilder() {
                   </div>
 
                   <div className="mt-4 space-y-3">
+                    {section.groups?.length ? section.groups.map((group) => (
+                      <div key={group.id} className="rounded-2xl border border-border bg-muted/40 p-3">
+                        <div className="text-sm font-black">{group.title || 'Item'}</div>
+                        <div className="mt-2 space-y-2">
+                          {group.fields.map((field) => (
+                            <div key={field.id} className="grid grid-cols-1 gap-2 rounded-xl border border-border bg-background px-3 py-2 md:grid-cols-[1fr_1.5fr] md:items-start">
+                              <div className="text-sm font-semibold text-foreground/60">{field.label || 'Field'}</div>
+                              <div className="text-sm text-foreground/80">{field.value || 'Value'}</div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )) : null}
                     {section.entries.length ? section.entries.map((entry) => (
                       <div key={entry.id} className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_1.45fr_auto]">
                         <input
@@ -1886,21 +2098,23 @@ export default function PortfolioBuilder() {
             <div className="mb-5 flex items-center justify-between gap-3">
               <div>
                 <h2 className="text-lg font-black uppercase tracking-[0.18em] text-foreground/80">Attachments</h2>
-                <p className="text-xs text-foreground/40">Upload certificates, portfolios, or supporting documents.</p>
+                <p className="text-xs text-foreground/40">Upload PDF or DOCX resumes to auto-fill key details, or add supporting documents.</p>
               </div>
               <button
                 type="button"
                 onClick={() => fileRef.current?.click()}
-                className="inline-flex items-center gap-2 rounded-xl bg-background px-3 py-2 text-[10px] font-black uppercase tracking-widest text-foreground/60 transition-all hover:border-accent hover:text-accent"
+                disabled={parsingAttachment}
+                className="inline-flex items-center gap-2 rounded-xl bg-background px-3 py-2 text-[10px] font-black uppercase tracking-widest text-foreground/60 transition-all hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:opacity-60"
               >
-                <UploadCloud size={14} /> Upload
+                {parsingAttachment ? <Loader2 size={14} className="animate-spin" /> : <UploadCloud size={14} />}
+                {parsingAttachment ? 'Reading' : 'Upload'}
               </button>
             </div>
 
             <input
               ref={fileRef}
               type="file"
-              accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,.webp"
+              accept=".pdf,.docx,.png,.jpg,.jpeg,.webp"
               className="hidden"
               title="Upload attachment"
               aria-label="Upload attachment"
@@ -2039,13 +2253,26 @@ export default function PortfolioBuilder() {
                     <div key={section.id} className="rounded-2xl border border-border bg-muted/40 p-3">
                       <div className="text-sm font-black">{section.title || 'Section'}</div>
                       <div className="mt-2 space-y-2">
+                        {section.groups?.length ? section.groups.map((group) => (
+                          <div key={group.id} className="rounded-xl border border-border bg-background p-3">
+                            <div className="text-sm font-black text-foreground/80">{group.title || 'Item'}</div>
+                            <div className="mt-2 space-y-2">
+                              {group.fields.map((field) => (
+                                <div key={field.id} className="grid grid-cols-1 gap-2 border-t border-border pt-2 first:border-t-0 first:pt-0 md:grid-cols-[1fr_1.5fr]">
+                                  <div className="text-xs font-black uppercase tracking-widest text-foreground/40">{field.label || 'Field'}</div>
+                                  <div className="text-sm text-foreground/80">{field.value || 'Value'}</div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )) : null}
                         {section.entries.length ? section.entries.map((entry) => (
                           <div key={entry.id} className="grid grid-cols-1 gap-2 rounded-xl border border-border bg-background px-3 py-2 md:grid-cols-[1fr_1.5fr] md:items-start">
                             <div className="text-sm font-semibold text-foreground/60">{entry.label || 'Entry'}</div>
                             <div className="text-sm text-foreground/80">{entry.value || 'Value'}</div>
                           </div>
                         )) : (
-                          <div className="text-xs text-foreground/40">No entries added yet.</div>
+                          section.groups?.length ? null : <div className="text-xs text-foreground/40">No entries added yet.</div>
                         )}
                       </div>
                     </div>
@@ -2126,6 +2353,44 @@ export default function PortfolioBuilder() {
                           {projectImageUploading && activeProjectImageId === project.id ? <Loader2 size={14} className="animate-spin" /> : <UploadCloud size={14} />}
                           Upload images
                         </button>
+                      </div>
+                      <div className="mt-3 space-y-2">
+                        <div className="text-[9px] font-black uppercase tracking-[0.18em] text-foreground/35">Tags</div>
+                        <div className="flex min-h-12 flex-wrap items-center gap-2 rounded-xl border border-border bg-muted px-3 py-2 transition-all focus-within:border-accent">
+                          {project.tags?.length ? project.tags.map((tag) => (
+                              <span key={tag} className="inline-flex items-center gap-2 rounded-full border border-accent/20 bg-accent/10 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-accent">
+                                {tag}
+                                <button
+                                  type="button"
+                                  onClick={() => removeProjectTag(project.id, tag)}
+                                  className="text-accent/60 transition-colors hover:text-accent"
+                                  title={`Remove ${tag}`}
+                                  aria-label={`Remove ${tag}`}
+                                >
+                                  <X size={11} />
+                                </button>
+                              </span>
+                          )) : null}
+                          <input
+                            value={projectTagDrafts[project.id] || ''}
+                            onChange={(e) => handleProjectTagDraftChange(project.id, e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ',') {
+                                e.preventDefault();
+                                addProjectTag(project.id);
+                              }
+                              if (e.key === 'Backspace' && !projectTagDrafts[project.id] && project.tags.length) {
+                                e.preventDefault();
+                                removeProjectTag(project.id, project.tags[project.tags.length - 1]);
+                              }
+                            }}
+                            onBlur={() => addProjectTag(project.id)}
+                            placeholder={project.tags?.length ? 'Add tag' : 'Type tag, press comma or Enter'}
+                            className="min-w-[180px] flex-1 bg-transparent text-sm outline-none placeholder:text-foreground/35"
+                            title="Project tags"
+                            aria-label="Project tags"
+                          />
+                        </div>
                       </div>
                       <div className="mt-3">
                         <div className="text-[9px] font-black uppercase tracking-[0.18em] text-foreground/35">Images</div>

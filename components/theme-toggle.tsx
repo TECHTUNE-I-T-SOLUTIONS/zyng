@@ -8,11 +8,14 @@ export function ThemeToggle() {
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
 
-  useEffect(() => setMounted(true), []);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setMounted(true), 0);
+    return () => window.clearTimeout(timer);
+  }, []);
 
   if (!mounted) return null;
 
-  const toggleTheme = (newTheme: 'light' | 'dark', e: React.MouseEvent) => {
+  const changeTheme = (newTheme: 'light' | 'dark', target: HTMLElement) => {
     if (theme === newTheme) return;
 
     if (!document.startViewTransition) {
@@ -20,7 +23,7 @@ export function ThemeToggle() {
       return;
     }
 
-    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const rect = target.getBoundingClientRect();
     const x = rect.left + rect.width / 2;
     const y = rect.top + rect.height / 2;
 
@@ -53,16 +56,51 @@ export function ThemeToggle() {
     });
   };
 
+  const toggleTheme = (target: HTMLElement) => {
+    changeTheme(theme === 'dark' ? 'light' : 'dark', target);
+  };
+
+  const handleThemeButtonClick = (selectedTheme: 'light' | 'dark', target: HTMLElement) => {
+    if (theme === selectedTheme) {
+      toggleTheme(target);
+      return;
+    }
+
+    changeTheme(selectedTheme, target);
+  };
+
   return (
-    <div className="inline-flex bg-muted rounded-full p-1 border border-border">
+    <div
+      role="button"
+      tabIndex={0}
+      aria-label="Toggle theme"
+      onClick={(e) => toggleTheme(e.currentTarget)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          toggleTheme(e.currentTarget);
+        }
+      }}
+      className="inline-flex bg-muted rounded-full p-1 border border-border cursor-pointer"
+    >
       <button
-        onClick={(e) => toggleTheme('light', e)}
+        type="button"
+        aria-label="Use light theme"
+        onClick={(e) => {
+          e.stopPropagation();
+          handleThemeButtonClick('light', e.currentTarget);
+        }}
         className={`p-2 rounded-full transition-all ${theme === 'light' ? 'bg-accent text-black shadow-inner' : 'opacity-40 hover:opacity-100'}`}
       >
         <Sun size={14} />
       </button>
       <button
-        onClick={(e) => toggleTheme('dark', e)}
+        type="button"
+        aria-label="Use dark theme"
+        onClick={(e) => {
+          e.stopPropagation();
+          handleThemeButtonClick('dark', e.currentTarget);
+        }}
         className={`p-2 rounded-full transition-all ${theme === 'dark' ? 'bg-accent text-black shadow-inner' : 'opacity-40 hover:opacity-100'}`}
       >
         <Moon size={14} />
@@ -70,4 +108,3 @@ export function ThemeToggle() {
     </div>
   );
 }
-

@@ -26,6 +26,7 @@ const publicNav = [
 export default function PublicLayout({ children }: { children: React.ReactNode }) {
   const { scrollY } = useScroll();
   const [isScrolled, setIsScrolled] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
   const { data: user } = useQuery({
     queryKey: ['public-layout-me'],
     queryFn: () => userService.getCurrentUser(),
@@ -38,21 +39,30 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
     });
   }, [scrollY]);
 
+  useEffect(() => {
+    const updateViewport = () => setIsMobile(window.innerWidth < 768);
+    updateViewport();
+    window.addEventListener('resize', updateViewport);
+    return () => window.removeEventListener('resize', updateViewport);
+  }, []);
+
+  const compactHeader = isScrolled && !isMobile;
+
   return (
     <div className="min-h-screen max-w-full flex flex-col bg-background text-foreground transition-colors duration-300">
       <div className="fixed top-0 left-0 w-full z-50 flex justify-center pointer-events-none">
         <motion.header
           animate={{
-            width: isScrolled ? "min(95%, 900px)" : "100%",
-            y: isScrolled ? 16 : 0,
-            borderRadius: isScrolled ? 32 : 0,
-            borderWidth: isScrolled ? 1 : 0,
+            width: compactHeader ? "min(95%, 900px)" : "100%",
+            y: compactHeader ? 16 : 0,
+            borderRadius: compactHeader ? 32 : 0,
+            borderWidth: compactHeader ? 1 : 0,
             borderBottomWidth: 1,
           }}
           transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
           className={cn(
             "pointer-events-auto px-6 py-4 flex justify-between items-center backdrop-blur-lg border-border",
-            isScrolled ? "bg-background/80 shadow-2xl shadow-black/5 dark:shadow-white/5" : "bg-background/50"
+            compactHeader ? "bg-background/80 shadow-2xl shadow-black/5 dark:shadow-white/5" : "bg-background/50"
           )}
         >
           <Link href="/" className="flex items-center gap-3">
@@ -82,8 +92,14 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
               </Link>
             )}
             <Link
+              href={user ? dashboardHref : '/in/login'}
+              className="text-xs md:hidden font-black uppercase tracking-widest px-5 py-2.5 bg-accent text-black rounded-full shadow-lg shadow-accent/20 hover:scale-105 transition-all text-center"
+            >
+              {user ? 'Zyng In' : 'Login'}
+            </Link>
+            <Link
               href={user ? dashboardHref : '/in/signup'}
-              className="text-xs font-black uppercase tracking-widest px-6 py-2.5 bg-accent text-black rounded-full shadow-lg shadow-accent/20 hover:scale-105 transition-all text-center"
+              className="hidden md:inline-block text-xs font-black uppercase tracking-widest px-6 py-2.5 bg-accent text-black rounded-full shadow-lg shadow-accent/20 hover:scale-105 transition-all text-center"
             >
               {user ? 'Zyng In' : 'Join'}
             </Link>

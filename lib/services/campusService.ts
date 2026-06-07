@@ -118,6 +118,30 @@ export const campusService = {
   }
   ,
 
+  async updateEvent(id: string, patch: any) {
+    const { data, error } = await supabase
+      .from('zing_events')
+      .update(patch)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  },
+
+  async deleteEvent(id: string) {
+    const { data, error } = await supabase
+      .from('zing_events')
+      .delete()
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  },
+
   // Create marketplace item
   async createMarketplace(payload: {
     title: string;
@@ -145,6 +169,30 @@ export const campusService = {
         created_by: payload.created_by || null,
         school_id: payload.school_id || null,
       })
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  },
+
+  async updateMarketplace(id: string, patch: any) {
+    const { data, error } = await supabase
+      .from('zing_marketplace')
+      .update(patch)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  },
+
+  async deleteMarketplace(id: string) {
+    const { data, error } = await supabase
+      .from('zing_marketplace')
+      .delete()
+      .eq('id', id)
       .select()
       .single();
 

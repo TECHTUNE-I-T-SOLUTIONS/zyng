@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState, useRef } from 'react';
+import { useEffect, useMemo, useState, useRef } from 'react';
 import { useToast } from '@/components/toast';
 import Link from 'next/link';
 import { usePosts } from '@/hooks/usePosts';
@@ -165,11 +165,26 @@ function PostCard({ post, index }: { post: Post; index: number }) {
   const toast = useToast();
   const [showPicker, setShowPicker] = useState(false);
   const hoverTimer = useRef<number | null>(null);
-  const hideTimer = useRef<number | null>(null);
   const touchTimer = useRef<number | null>(null);
+  const reactionPickerRef = useRef<HTMLDivElement | null>(null);
 
   const replyTree = useMemo(() => buildReplyTree(localReplies), [localReplies]);
   const userReaction = ((post as any).reactions || []).find((r: any) => r.user_id === me?.id);
+
+  useEffect(() => {
+    if (!showPicker) return;
+    const closeOnOutside = (event: PointerEvent) => {
+      if (reactionPickerRef.current?.contains(event.target as Node)) return;
+      setShowPicker(false);
+    };
+    const closeOnScroll = () => setShowPicker(false);
+    document.addEventListener('pointerdown', closeOnOutside);
+    window.addEventListener('scroll', closeOnScroll, true);
+    return () => {
+      document.removeEventListener('pointerdown', closeOnOutside);
+      window.removeEventListener('scroll', closeOnScroll, true);
+    };
+  }, [showPicker]);
 
   const handleShare = async () => {
     const url = `${window.location.origin}/z-post/${post.id}`;
@@ -401,10 +416,6 @@ function PostCard({ post, index }: { post: Post; index: number }) {
             <div
               className="relative inline-block"
               onMouseEnter={() => {
-                if (hideTimer.current) {
-                  window.clearTimeout(hideTimer.current);
-                  hideTimer.current = null;
-                }
                 hoverTimer.current = window.setTimeout(() => setShowPicker(true), 350) as unknown as number;
               }}
               onMouseLeave={() => {
@@ -412,7 +423,6 @@ function PostCard({ post, index }: { post: Post; index: number }) {
                   window.clearTimeout(hoverTimer.current);
                   hoverTimer.current = null;
                 }
-                hideTimer.current = window.setTimeout(() => setShowPicker(false), 1800) as unknown as number;
               }}
               onTouchStart={() => {
                 touchTimer.current = window.setTimeout(() => {
@@ -461,7 +471,7 @@ function PostCard({ post, index }: { post: Post; index: number }) {
 
         <AnimatePresence>
           {showPicker && (
-            <motion.div initial={{ opacity: 0, y: 8, scale: 0.9 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 6 }} transition={{ duration: 0.18 }} className="absolute bottom-4 left-8 transform translate-y-[-6px] -translate-x-1/4 bg-background border border-border rounded-3xl p-2 flex gap-2 shadow-lg">
+            <motion.div ref={reactionPickerRef} initial={{ opacity: 0, y: 8, scale: 0.9 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 6 }} transition={{ duration: 0.18 }} className="absolute bottom-4 left-8 transform translate-y-[-6px] -translate-x-1/4 bg-background border border-border rounded-3xl p-2 flex gap-2 shadow-lg">
               {reactionTypes.map((reactionType) => (
                 <motion.button key={reactionType.key} whileHover={{ scale: 1.2 }} whileTap={{ scale: 0.9 }} onClick={() => { handleReact(reactionType.key); setShowPicker(false); }} className="text-lg px-2">
                   <motion.img src={reactionType.emojiUrl} alt={reactionType.key} className="w-6 h-6 rounded" initial={{ y: 6, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ duration: 0.18 }} />
@@ -553,10 +563,25 @@ function ReplyThreadItem({
 }) {
   const [showPicker, setShowPicker] = useState(false);
   const hoverTimer = useRef<number | null>(null);
-  const hideTimer = useRef<number | null>(null);
   const touchTimer = useRef<number | null>(null);
+  const reactionPickerRef = useRef<HTMLDivElement | null>(null);
   const userReaction = reply.reactions?.find((reaction) => reaction.user_id === currentUserId);
   const nestedIndent = depth > 0 ? 'ml-4 pl-4 border-l border-border/60' : '';
+
+  useEffect(() => {
+    if (!showPicker) return;
+    const closeOnOutside = (event: PointerEvent) => {
+      if (reactionPickerRef.current?.contains(event.target as Node)) return;
+      setShowPicker(false);
+    };
+    const closeOnScroll = () => setShowPicker(false);
+    document.addEventListener('pointerdown', closeOnOutside);
+    window.addEventListener('scroll', closeOnScroll, true);
+    return () => {
+      document.removeEventListener('pointerdown', closeOnOutside);
+      window.removeEventListener('scroll', closeOnScroll, true);
+    };
+  }, [showPicker]);
 
   return (
     <div className={nestedIndent}>
@@ -571,10 +596,6 @@ function ReplyThreadItem({
             <div
               className="relative inline-block"
               onMouseEnter={() => {
-                if (hideTimer.current) {
-                  window.clearTimeout(hideTimer.current);
-                  hideTimer.current = null;
-                }
                 hoverTimer.current = window.setTimeout(() => setShowPicker(true), 350) as unknown as number;
               }}
               onMouseLeave={() => {
@@ -582,7 +603,6 @@ function ReplyThreadItem({
                   window.clearTimeout(hoverTimer.current);
                   hoverTimer.current = null;
                 }
-                hideTimer.current = window.setTimeout(() => setShowPicker(false), 1200) as unknown as number;
               }}
               onTouchStart={() => {
                 touchTimer.current = window.setTimeout(() => setShowPicker(true), 500) as unknown as number;
@@ -616,13 +636,15 @@ function ReplyThreadItem({
             </div>
           </div>
 
-          <button type="button" onClick={() => onStartReply(reply)} className="text-[11px] font-bold text-foreground/50 hover:text-foreground transition-all">
-            Reply
-          </button>
+          {depth === 0 && (
+            <button type="button" onClick={() => onStartReply(reply)} className="text-[11px] font-bold text-foreground/50 hover:text-foreground transition-all">
+              Reply
+            </button>
+          )}
 
           <AnimatePresence>
             {showPicker && (
-              <motion.div initial={{ opacity: 0, y: 8, scale: 0.9 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 6 }} transition={{ duration: 0.18 }} className="absolute bottom-full left-0 mb-2 bg-background border border-border rounded-3xl p-2 flex gap-2 shadow-lg z-10">
+              <motion.div ref={reactionPickerRef} initial={{ opacity: 0, y: 8, scale: 0.9 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 6 }} transition={{ duration: 0.18 }} className="absolute bottom-full left-0 mb-2 bg-background border border-border rounded-3xl p-2 flex gap-2 shadow-lg z-10">
                 {reactionTypes.map((reactionType) => (
                   <motion.button key={reactionType.key} whileHover={{ scale: 1.2 }} whileTap={{ scale: 0.9 }} onClick={() => { onReactReply(reply.id, reactionType.key); setShowPicker(false); }} className="text-lg px-2">
                     <motion.img src={reactionType.emojiUrl} alt={reactionType.key} className="w-5 h-5 rounded" initial={{ y: 6, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ duration: 0.18 }} />

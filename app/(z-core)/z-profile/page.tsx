@@ -7,7 +7,7 @@ import { userService } from '@/lib/services/userService';
 import { postService } from '@/lib/services/postService';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useToast } from '@/components/toast';
-import { Pencil, Shield, LogOut, Award, Users, BookOpen, Loader2, X } from 'lucide-react';
+import { Pencil, Shield, LogOut, Award, Users, BookOpen, Loader2, X, BadgeCheck } from 'lucide-react';
 import { supabase } from '@/lib/db/supabase';
 
 export default function ProfilePage() {
@@ -33,20 +33,25 @@ export default function ProfilePage() {
   const queryClient = useQueryClient();
   const toast = useToast();
   const profileUser = user as any;
+  const [editingPost, setEditingPost] = useState<any | null>(null);
+  const [editContent, setEditContent] = useState<string>('');
 
   useEffect(() => {
     if (!user) return;
-    setProfileDraft({
-      full_name: user.full_name || '',
-      z_name: user.z_name || '',
-      email: user.email || '',
-      phone: user.phone || '',
-      course_of_study: user.course_of_study || '',
-      graduation_date: user.graduation_date || '',
-      bio: user.bio || '',
-      hobbies: Array.isArray(user.hobbies) ? user.hobbies.join(', ') : '',
-      skills: Array.isArray(user.skills) ? user.skills.join(', ') : '',
-    });
+    const timer = window.setTimeout(() => {
+      setProfileDraft({
+        full_name: user.full_name || '',
+        z_name: user.z_name || '',
+        email: user.email || '',
+        phone: user.phone || '',
+        course_of_study: user.course_of_study || '',
+        graduation_date: user.graduation_date || '',
+        bio: user.bio || '',
+        hobbies: Array.isArray(user.hobbies) ? user.hobbies.join(', ') : '',
+        skills: Array.isArray(user.skills) ? user.skills.join(', ') : '',
+      });
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [user]);
 
   const { data: myPosts, isLoading: postsLoading } = useQuery({
@@ -54,6 +59,20 @@ export default function ProfilePage() {
     queryFn: () => user?.id ? postService.getPostsByUser(user.id) : Promise.resolve([]),
     enabled: !!user?.id,
   });
+  const postCount = myPosts?.length || 0;
+  const meaningfulProfileFields = [
+    profileUser?.full_name,
+    profileUser?.z_name,
+    profileUser?.email || profileUser?.phone,
+    profileUser?.school?.name || profileUser?.schools?.[0]?.name,
+    profileUser?.department?.name || profileUser?.departments?.[0]?.name,
+    profileUser?.course_of_study,
+    profileUser?.bio && profileUser.bio.length >= 20,
+    Array.isArray(profileUser?.skills) && profileUser.skills.length >= 2,
+  ];
+  const profileCompleteness = Math.round((meaningfulProfileFields.filter(Boolean).length / meaningfulProfileFields.length) * 100);
+  const verificationReady = postCount >= 3 && profileCompleteness >= 75;
+  const maskedAvatarLabel = profileUser?.avatar_url ? `zyng-${profileUser.z_name || 'user'}-avatar` : 'Not set';
 
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -65,11 +84,12 @@ export default function ProfilePage() {
     if (myPosts && myPosts.length > 0) {
       const target = myPosts.find((p: any) => String(p.id) === String(editPostId));
       if (target) {
-        setEditingPost(target);
-        setEditContent(target.content || '');
-        // remove query param
-        try { router.replace('/z-profile'); } catch (e) {}
-        return;
+        const timer = window.setTimeout(() => {
+          setEditingPost(target);
+          setEditContent(target.content || '');
+          try { router.replace('/z-profile'); } catch (e) {}
+        }, 0);
+        return () => window.clearTimeout(timer);
       }
     }
 
@@ -78,21 +98,20 @@ export default function ProfilePage() {
       try {
         const p = await postService.getPostById(editPostId);
         if (p) {
-          setEditingPost(p);
-          setEditContent(p.content || '');
-          try { router.replace('/z-profile'); } catch (e) {}
+          window.setTimeout(() => {
+            setEditingPost(p);
+            setEditContent(p.content || '');
+            try { router.replace('/z-profile'); } catch (e) {}
+          }, 0);
         }
       } catch (err) {
         // ignore
       }
     })();
-  }, [searchParams, myPosts]);
+  }, [searchParams, myPosts, router]);
 
   // Personas fallback: if API returns empty, use personas included on user
   const effectivePersonas = myPosts && myPosts.length === 0 && user?.personas ? user.personas : undefined;
-
-  const [editingPost, setEditingPost] = useState<any | null>(null);
-  const [editContent, setEditContent] = useState<string>('');
 
   const updateMutation = useMutation({
     mutationFn: ({ id, updates }: any) => postService.updatePost(id, updates),
@@ -341,7 +360,6 @@ export default function ProfilePage() {
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
                     {[
-                      ['User ID', profileUser.id],
                       ['Phone', profileUser.phone],
                       ['Email', profileUser.email || 'Not set'],
                       ['Full name', profileUser.full_name || 'Not set'],
@@ -355,14 +373,10 @@ export default function ProfilePage() {
                       ['Hobbies', Array.isArray(profileUser.hobbies) && profileUser.hobbies.length ? profileUser.hobbies.join(', ') : 'Not set'],
                       ['Skills', Array.isArray(profileUser.skills) && profileUser.skills.length ? profileUser.skills.join(', ') : 'Not set'],
                       ['Bio', profileUser.bio || 'Not set'],
-                      ['Trust score', String(profileUser.trust_score ?? 0)],
-                      ['Verified', profileUser.is_verified ? 'Yes' : 'No'],
-                      ['Held', profileUser.is_held ? 'Yes' : 'No'],
+                      ['Trust level', profileUser.is_verified ? 'Verified' : `Building trust (${profileUser.trust_score ?? 0})`],
                       ['Referral code', profileUser.referral_code || 'Not set'],
-                      ['Onboarding completed', profileUser.onboarding_completed ? 'Yes' : 'No'],
-                      ['Last login', profileUser.last_login ? new Date(profileUser.last_login).toLocaleString() : 'Not set'],
                       ['Created at', profileUser.created_at ? new Date(profileUser.created_at).toLocaleString() : 'Not set'],
-                      ['Avatar URL', profileUser.avatar_url || 'Not set'],
+                      ['Avatar', maskedAvatarLabel],
                     ].map(([label, value]) => (
                       <div key={label} className="rounded-2xl border border-border/50 bg-background px-4 py-3 flex flex-col gap-1">
                         <span className="text-[10px] font-black uppercase tracking-widest text-foreground/40">{label}</span>
@@ -373,6 +387,32 @@ export default function ProfilePage() {
                 )}
               </div>
             </motion.div>
+
+            {postCount >= 3 && (
+              <div className="rounded-[2rem] border border-accent/20 bg-accent/10 p-6">
+                <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                  <div className="flex gap-4">
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-accent text-black">
+                      <BadgeCheck size={24} />
+                    </div>
+                    <div>
+                      <h3 className="font-black uppercase tracking-tight text-accent">Verification check unlocked</h3>
+                      <p className="mt-1 text-sm leading-6 text-foreground/60">
+                        You have created {postCount} posts. Zyng reviewed your profile completeness at {profileCompleteness}%.
+                        {verificationReady ? ' You can start live status verification now.' : ' Add a fuller bio, school details, course, and skills before starting verification.'}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    disabled={!verificationReady}
+                    onClick={() => router.push('/z-verify')}
+                    className="rounded-2xl bg-accent px-5 py-3 text-xs font-black uppercase tracking-widest text-black disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    Verify Account
+                  </button>
+                </div>
+              </div>
+            )}
 
               <div className="bg-muted border border-border rounded-[2.5rem] p-8">
                 <h3 className="text-xs font-black uppercase tracking-widest text-foreground/30 mb-6">Your Posts</h3>
@@ -511,7 +551,7 @@ export default function ProfilePage() {
               </div>
               
               <h2 className="text-2xl font-black text-foreground mb-2 tracking-tight uppercase">Leaving so soon?</h2>
-              <p className="text-foreground/40 text-sm mb-8 font-medium italic">Your active personas will remain live, but you won't receive real-time notifications.</p>
+              <p className="text-foreground/40 text-sm mb-8 font-medium italic">Your active personas will remain live, but you won&apos;t receive real-time notifications.</p>
               
               <div className="flex flex-col gap-3">
                 <button 

@@ -25,6 +25,7 @@ import { slugify } from '@/lib/utils';
 
 export default function RoomsPage() {
   const [activeTab, setActiveTab] = useState<'all' | 'joined'>('all');
+  const [searchQuery, setSearchQuery] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState<string | null>(null);
   const { data: user } = useQuery({ queryKey: ['me'], queryFn: () => userService.getCurrentUser() });
@@ -47,6 +48,22 @@ export default function RoomsPage() {
     const isMember = Array.isArray(room.zing_room_members) && room.zing_room_members.some((member: any) => member.user_id === user.id);
     const isOwner = room.created_by === user.id;
     return isMember || isOwner;
+  }).filter((room: any) => {
+    const normalized = searchQuery.trim().toLowerCase();
+    if (!normalized) return true;
+    const lastMessage = Array.isArray(room.zing_messages) && room.zing_messages.length > 0
+      ? [...room.zing_messages].sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0]
+      : null;
+    const creatorPersona = room.creator?.personas?.find((persona: any) => persona.is_active) || room.creator?.personas?.[0];
+    return [
+      room.name,
+      room.description,
+      room.is_private ? 'private' : 'public',
+      creatorPersona?.name,
+      room.creator?.z_name,
+      lastMessage?.content,
+      lastMessage?.sender?.z_name,
+    ].filter(Boolean).join(' ').toLowerCase().includes(normalized);
   });
 
   const joinMutation = useMutation({
@@ -78,6 +95,8 @@ export default function RoomsPage() {
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-foreground/20" size={18} />
               <input 
                 type="text" 
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search rooms..." 
                 className="bg-muted border border-border rounded-2xl pl-12 pr-6 py-3 w-full md:w-64 focus:outline-none focus:border-accent transition-all text-sm"
               />
@@ -110,7 +129,7 @@ export default function RoomsPage() {
         ) : !visibleRooms || visibleRooms.length === 0 ? (
           <div className="text-center py-20 bg-muted/20 border border-dashed border-border rounded-[3rem]">
             <p className="text-foreground/40 font-bold italic">
-              {activeTab === 'joined' && user?.id ? 'You have not joined any rooms yet.' : 'No active rooms found. Be the first to start one!'}
+              {searchQuery.trim() ? 'No rooms match your search.' : activeTab === 'joined' && user?.id ? 'You have not joined any rooms yet.' : 'No active rooms found. Be the first to start one!'}
             </p>
           </div>
         ) : (

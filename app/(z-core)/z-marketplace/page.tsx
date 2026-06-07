@@ -1,12 +1,12 @@
 'use client';
 
 import { useState, useRef, useMemo } from 'react';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { campusService } from '@/lib/services/campusService';
 import { userService } from '@/lib/services/userService';
 import { zingService } from '@/lib/services/zingService';
 import { motion } from 'framer-motion';
-import { ShoppingBag, Search, Plus, Loader2, X, Image as ImageIcon, MessageCircle, Eye } from 'lucide-react';
+import { ShoppingBag, Search, Plus, Loader2, X, Image as ImageIcon, MessageCircle, Eye, MoreVertical, Pencil, Trash2, Share2 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { slugify } from '@/lib/utils';
@@ -35,6 +35,8 @@ export default function MarketplacePage() {
   }, [items, searchQuery]);
 
   const [showSellModal, setShowSellModal] = useState(false);
+  const [editingItem, setEditingItem] = useState<any | null>(null);
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [price, setPrice] = useState('');
@@ -49,6 +51,36 @@ export default function MarketplacePage() {
   
   const { data: user } = useQuery({ queryKey: ['me'], queryFn: () => userService.getCurrentUser() });
   const router = useRouter();
+  const queryClient = useQueryClient();
+
+  const resetItemForm = () => {
+    setTitle('');
+    setDescription('');
+    setPrice('');
+    setItemCategory(ITEM_CATEGORIES[0]);
+    setSelectedImages([]);
+    setImagePreviews([]);
+    setErrorMsg('');
+    setEditingItem(null);
+  };
+
+  const openCreateModal = () => {
+    resetItemForm();
+    setShowSellModal(true);
+  };
+
+  const openEditModal = (item: any) => {
+    setEditingItem(item);
+    setTitle(item.title || '');
+    setDescription(item.description || '');
+    setPrice(item.price ? String(item.price) : '');
+    setItemCategory(item.category || ITEM_CATEGORIES[0]);
+    setSelectedImages([]);
+    setImagePreviews(Array.isArray(item.images) ? item.images : item.media_url ? [item.media_url] : []);
+    setErrorMsg('');
+    setOpenMenuId(null);
+    setShowSellModal(true);
+  };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
@@ -99,18 +131,26 @@ export default function MarketplacePage() {
         if (res.ok && json.url) imageUrls.push(json.url);
       }
 
-      await campusService.createMarketplace({
+      const existingImages = editingItem ? imagePreviews.filter((src) => src.startsWith('http')) : [];
+      const finalImages = [...existingImages, ...imageUrls];
+      const payload = {
         title: title.trim(),
         description: description || null,
         price: price ? Number(price) : null,
-        media_url: imageUrls.length > 0 ? imageUrls[0] : null,
-        images: imageUrls.length > 0 ? imageUrls : null,
+        media_url: finalImages.length > 0 ? finalImages[0] : null,
+        images: finalImages.length > 0 ? finalImages : null,
         category: itemCategory || null,
         created_by: user.id,
         school_id: user.school_id || null,
-      });
+      };
+      if (editingItem) {
+        await campusService.updateMarketplace(editingItem.id, payload);
+      } else {
+        await campusService.createMarketplace(payload);
+      }
       setShowSellModal(false);
-      window.location.reload();
+      resetItemForm();
+      queryClient.invalidateQueries({ queryKey: ['marketplace'] });
     } catch (err) {
       console.error(err);
       setErrorMsg('Failed to post item');
@@ -128,6 +168,19 @@ export default function MarketplacePage() {
     } catch (err) {
       console.error(err);
       alert("Failed to start conversation.");
+    }
+  };
+
+  const shareItem = async (item: any) => {
+    const url = `${window.location.origin}/z-marketplace/${slugify(`${item.title}-${item.id}`)}`;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: item.title, text: item.description || 'Check out this listing on Zyng.', url });
+        return;
+      }
+      await navigator.clipboard.writeText(url);
+    } catch {
+      await navigator.clipboard.writeText(url);
     }
   };
 
@@ -150,7 +203,7 @@ export default function MarketplacePage() {
                 className="bg-muted border border-border rounded-2xl pl-12 pr-6 py-3 w-full md:w-64 focus:outline-none focus:border-accent transition-all text-sm"
               />
             </div>
-            <button onClick={() => setShowSellModal(true)} className="bg-accent text-black px-6 py-3 rounded-2xl font-black flex items-center gap-2 hover:scale-105 transition-all text-xs uppercase tracking-widest">
+            <button onClick={openCreateModal} className="bg-accent text-black px-6 py-3 rounded-2xl font-black flex items-center gap-2 hover:scale-105 transition-all text-xs uppercase tracking-widest">
               <Plus size={20} />
               SELL
             </button>
@@ -202,6 +255,43 @@ export default function MarketplacePage() {
                   <div className="absolute top-2 left-2 bg-background/90 backdrop-blur-md text-[9px] font-black px-2 py-1 rounded-lg uppercase tracking-wider text-accent shadow-sm">
                     {item.category}
                   </div>
+                  <div className="absolute right-2 top-2 z-20">
+                    <button
+                      type="button"
+                      aria-label="Item actions"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setOpenMenuId((current) => current === item.id ? null : item.id);
+                      }}
+                      className="rounded-lg border border-border bg-background/90 p-2 text-foreground/60 backdrop-blur hover:text-foreground"
+                    >
+                      <MoreVertical size={16} />
+                    </button>
+                    {openMenuId === item.id && (
+                      <div className="absolute right-0 top-10 w-36 rounded-xl border border-border bg-background p-2 shadow-xl">
+                        <button onClick={(e) => { e.stopPropagation(); shareItem(item); setOpenMenuId(null); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-muted">
+                          <Share2 size={14} /> Share
+                        </button>
+                        {item.created_by === user?.id && (
+                          <>
+                            <button onClick={(e) => { e.stopPropagation(); openEditModal(item); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-muted">
+                              <Pencil size={14} /> Edit
+                            </button>
+                            <button onClick={async (e) => {
+                              e.stopPropagation();
+                              if (!confirm('Delete this item?')) return;
+                              await campusService.deleteMarketplace(item.id);
+                              queryClient.invalidateQueries({ queryKey: ['marketplace'] });
+                              setOpenMenuId(null);
+                            }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-red-500 hover:bg-red-500/10">
+                              <Trash2 size={14} /> Delete
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
                 <div className="p-4 flex flex-col flex-1">
                   <h3 className="font-bold text-sm mb-1 line-clamp-2 leading-tight">{item.title}</h3>
@@ -236,8 +326,8 @@ export default function MarketplacePage() {
           <div onClick={() => setShowSellModal(false)} className="absolute inset-0 bg-black/80 backdrop-blur-sm overflow-y-auto"></div>
           <div className="relative w-full max-w-2xl bg-background border border-border p-6 md:p-8 rounded-[2rem] z-10 max-h-[90vh] overflow-y-auto shadow-2xl">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-black uppercase tracking-tighter">List an Item</h2>
-              <button title="Close modal" aria-label="Close modal" onClick={() => setShowSellModal(false)} className="p-2 bg-muted rounded-xl hover:bg-muted/80"><X size={20}/></button>
+              <h2 className="text-2xl font-black uppercase tracking-tighter">{editingItem ? 'Edit Item' : 'List an Item'}</h2>
+              <button title="Close modal" aria-label="Close modal" onClick={() => { setShowSellModal(false); resetItemForm(); }} className="p-2 bg-muted rounded-xl hover:bg-muted/80"><X size={20}/></button>
             </div>
 
             {errorMsg && (
@@ -263,7 +353,14 @@ export default function MarketplacePage() {
                         <button 
                           title="Remove image"
                           aria-label="Remove image"
-                          onClick={(e) => { e.stopPropagation(); removeImage(i); }} 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (src.startsWith('http')) {
+                              setImagePreviews((current) => current.filter((_, index) => index !== i));
+                              return;
+                            }
+                            removeImage(i);
+                          }} 
                           className="absolute inset-0 bg-black/50 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
                         >
                           <X size={16} />
@@ -298,7 +395,7 @@ export default function MarketplacePage() {
 
             <div className="mt-8 flex justify-end">
               <button disabled={uploading} onClick={handleSell} className="bg-accent text-black px-8 py-4 rounded-2xl font-black flex items-center gap-2 hover:scale-105 transition-all disabled:opacity-50 disabled:hover:scale-100">
-                {uploading ? <><Loader2 size={18} className="animate-spin" /> POSTING...</> : 'POST ITEM'}
+                {uploading ? <><Loader2 size={18} className="animate-spin" /> SAVING...</> : editingItem ? 'SAVE ITEM' : 'POST ITEM'}
               </button>
             </div>
           </div>

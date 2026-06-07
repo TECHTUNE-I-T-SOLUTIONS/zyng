@@ -26,6 +26,7 @@ import { useToast } from '@/components/toast';
 import { cn } from '@/lib/utils';
 import { userService } from '@/lib/services/userService';
 import { ThemeToggle } from '@/components/theme-toggle';
+import { ZAssistant } from '@/components/z-assistant';
 import { supabase } from '@/lib/db/supabase';
 import { getPersonaDisplay, graduationHasPassed } from '@/lib/persona-utils';
 
@@ -376,6 +377,7 @@ export default function ZLayout({ children }: { children: React.ReactNode }) {
           </motion.div>
         )}
       </AnimatePresence>
+      <ZAssistant user={user} />
     </div>
   );
 }

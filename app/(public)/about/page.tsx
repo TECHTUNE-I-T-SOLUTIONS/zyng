@@ -1,7 +1,40 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { Target, Users, Server, Globe2 } from 'lucide-react';
+import { BriefcaseBusiness, GraduationCap, MessageSquare, Network, ShieldCheck, Sparkles, Target, Users, Server, Globe2 } from 'lucide-react';
+
+const productSurfaces = [
+  {
+    title: 'Campus conversations',
+    description: 'A chronological feed for confessions, questions, hot takes, updates, missed connections, project drops, and everyday campus signal.',
+  },
+  {
+    title: 'Identity-aware personas',
+    description: 'Multiple personas let people speak with context while keeping their core account and school identity protected behind the scenes.',
+  },
+  {
+    title: 'Rooms and messages',
+    description: 'Private and public rooms support class groups, communities, events, societies, alumni circles, and safer one-to-one conversation.',
+  },
+  {
+    title: 'Opportunity network',
+    description: 'Jobs, referrals, portfolios, alumni search, marketplace listings, and events connect campus reputation to practical next steps.',
+  },
+];
+
+const audiences = [
+  'Students who want a real campus feed without turning every thought into a permanent public profile.',
+  'Graduates who want to keep their school network useful after final year, NYSC, internships, first jobs, or relocation.',
+  'Alumni who want to mentor, refer, hire, host events, reconnect, or give back to the same school community.',
+  'School communities that need safer digital spaces with reporting, verification, moderation, and network boundaries.',
+];
+
+const roadmap = [
+  'AI-assisted discovery for search, summaries, matching, and safer moderation workflows.',
+  'Stronger school verification paths for departments, programs, alumni cohorts, staff, and approved partners.',
+  'Better professional profiles that turn campus activity, skills, projects, and referrals into career momentum.',
+  'More tools for events, rooms, local marketplace needs, and alumni-led opportunity pipelines.',
+];
 
 export default function AboutPage() {
   return (
@@ -10,7 +43,7 @@ export default function AboutPage() {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 0.8 }}
-        className="px-6 text-center max-w-4xl mx-auto space-y-8 pt-16 pb-18"
+        className="px-6 text-center max-w-auto mx-auto space-y-8 pt-16 pb-18"
       >
         <motion.h1 
           initial={{ opacity: 0, y: 20 }}
@@ -26,6 +59,34 @@ export default function AboutPage() {
           It supports current students, recent graduates, long-time alumni, and school communities that need identity-aware social tools without exposing an entire personal profile to every interaction.
         </p>
       </motion.section>
+
+      <section className="px-6 max-w-auto mx-auto pb-20">
+        <div className="grid gap-8 lg:grid-cols-[0.9fr_1.1fr]">
+          <motion.div
+            initial={{ opacity: 0, y: 24 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-100px" }}
+            className="space-y-6"
+          >
+            <div className="text-xs font-black uppercase tracking-[0.24em] text-accent">Why Zyng exists</div>
+            <h2 className="text-3xl md:text-5xl font-medium tracking-tight">Campus life has always been social. The tools around it have not kept up.</h2>
+          </motion.div>
+          <motion.div
+            initial={{ opacity: 0, y: 24 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-100px" }}
+            transition={{ delay: 0.1 }}
+            className="rounded-lg border border-border bg-muted/20 p-8 space-y-5 text-sm leading-7 text-foreground/70"
+          >
+            <p>
+              Most students already live inside dozens of disconnected group chats, anonymous pages, public social networks, departmental notices, marketplace groups, and alumni channels. The result is noisy, fragmented, and often unsafe: people miss important information, opportunities are hard to verify, and school communities lose their memory when students graduate.
+            </p>
+            <p>
+              Zyng brings those pieces into one school-bound network. It is social enough for everyday campus culture, structured enough for opportunities and alumni relationships, and private enough to let people participate without forcing their full identity into every moment.
+            </p>
+          </motion.div>
+        </div>
+      </section>
 
       <motion.section 
         initial={{ opacity: 0, y: 30 }}
@@ -79,6 +140,61 @@ export default function AboutPage() {
         </div>
       </motion.section>
 
+      <section className="px-6 max-w-auto mx-auto mt-28 space-y-10">
+        <div className="max-w-3xl space-y-4">
+          <div className="text-xs font-black uppercase tracking-[0.24em] text-accent">What the platform connects</div>
+          <h2 className="text-3xl md:text-5xl font-medium tracking-tight">One place for the social, academic, and professional sides of school life.</h2>
+          <p className="text-sm leading-7 text-foreground/60">
+            Zyng is not only a feed, and it is not only a job board. The platform is designed as a connective layer for the things that already happen around school communities every day.
+          </p>
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-2">
+          {productSurfaces.map((surface, index) => (
+            <motion.div
+              key={surface.title}
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: "-100px" }}
+              transition={{ delay: index * 0.06 }}
+              className="rounded-lg border border-border bg-background p-7"
+            >
+              <div className="mb-5 flex h-11 w-11 items-center justify-center rounded-md border border-border bg-muted/40">
+                {[MessageSquare, Sparkles, Network, BriefcaseBusiness][index] && (() => {
+                  const Icon = [MessageSquare, Sparkles, Network, BriefcaseBusiness][index];
+                  return <Icon size={20} className="text-accent" />;
+                })()}
+              </div>
+              <h3 className="text-xl font-medium">{surface.title}</h3>
+              <p className="mt-3 text-sm leading-7 text-foreground/65">{surface.description}</p>
+            </motion.div>
+          ))}
+        </div>
+      </section>
+
+      <section className="px-6 max-w-auto mx-auto mt-28">
+        <div className="rounded-lg border border-border bg-muted/10 p-8 md:p-10">
+          <div className="grid gap-10 lg:grid-cols-[0.8fr_1.2fr]">
+            <div className="space-y-4">
+              <div className="flex h-12 w-12 items-center justify-center rounded-md border border-border bg-background">
+                <GraduationCap className="text-accent" />
+              </div>
+              <h2 className="text-3xl font-medium tracking-tight">Built for the whole school lifecycle.</h2>
+              <p className="text-sm leading-7 text-foreground/60">
+                A school network should not expire at graduation. Zyng keeps students, graduates, alumni, and school communities connected through different seasons of the same identity.
+              </p>
+            </div>
+            <div className="grid gap-3">
+              {audiences.map((item) => (
+                <div key={item} className="rounded-md border border-border bg-background p-4 text-sm leading-7 text-foreground/70">
+                  {item}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Stats/Facts */}
       <motion.section 
         initial={{ opacity: 0, y: 30 }}
@@ -108,6 +224,46 @@ export default function AboutPage() {
             </div>
          </div>
       </motion.section>
+
+      <section className="px-6 max-w-auto mx-auto pb-28">
+        <div className="grid gap-8 lg:grid-cols-2">
+          <motion.div
+            initial={{ opacity: 0, y: 24 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-100px" }}
+            className="rounded-lg border border-border bg-background p-8 space-y-5"
+          >
+            <div className="flex h-12 w-12 items-center justify-center rounded-md border border-border bg-muted/40">
+              <ShieldCheck className="text-accent" />
+            </div>
+            <h2 className="text-3xl font-medium tracking-tight">Trust is part of the product, not an afterthought.</h2>
+            <p className="text-sm leading-7 text-foreground/65">
+              Zyng uses school context, personas, reporting, trust signals, verification, and admin workflows to reduce abuse without flattening every conversation into a corporate profile. The goal is to keep expression alive while giving communities tools to respond when something goes wrong.
+            </p>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 24 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-100px" }}
+            transition={{ delay: 0.08 }}
+            className="rounded-lg border border-border bg-background p-8 space-y-5"
+          >
+            <div className="flex h-12 w-12 items-center justify-center rounded-md border border-border bg-muted/40">
+              <Sparkles className="text-accent" />
+            </div>
+            <h2 className="text-3xl font-medium tracking-tight">Where Zyng is going next.</h2>
+            <div className="space-y-3">
+              {roadmap.map((item) => (
+                <div key={item} className="flex gap-3 text-sm leading-7 text-foreground/65">
+                  <span className="mt-3 h-1.5 w-1.5 shrink-0 rounded-full bg-accent" />
+                  <span>{item}</span>
+                </div>
+              ))}
+            </div>
+          </motion.div>
+        </div>
+      </section>
     </div>
   );
 }

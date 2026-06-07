@@ -1,0 +1,10 @@
+import type { Metadata } from 'next';
+
+export const metadata: Metadata = {
+  title: 'Offline | Zyng',
+  description: 'Zyng offline mode for limited access while your connection is unavailable.',
+};
+
+export default function OfflineLayout({ children }: { children: React.ReactNode }) {
+  return children;
+}

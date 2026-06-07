@@ -45,6 +45,7 @@ export const sightService = {
     title: string;
     description?: string;
     category?: string;
+    tags?: string[];
     link?: string;
     images?: string[];
     user_id: string;

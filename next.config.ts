@@ -23,6 +23,7 @@ const nextConfig: NextConfig = {
     ],
   },
   output: 'standalone',
+  serverExternalPackages: ['@napi-rs/canvas', 'pdf-parse', 'pdfjs-dist'],
   transpilePackages: ['motion'],
   turbopack: {},
   webpack: (config, {dev}) => {
