@@ -5,7 +5,7 @@ import { useToast } from '@/components/toast';
 import Link from 'next/link';
 import { usePosts } from '@/hooks/usePosts';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MessageSquare, ThumbsUp, Loader2, Plus, XCircle, Flame, Clock, Activity } from 'lucide-react';
+import { MessageSquare, ThumbsUp, Loader2, Plus, XCircle, Flame, Clock, Activity, BadgeCheck, Sparkles, Users, CalendarDays } from 'lucide-react';
 import { Share2, Send } from 'lucide-react';
 import { Post } from '@/types';
 import { postService } from '@/lib/services/postService';
@@ -99,6 +99,36 @@ export default function ZFeed() {
 
 function FeedList({ filter }: { filter: string }) {
   const { data: posts, isLoading, error } = usePosts();
+  const { data: me } = useQuery({ queryKey: ['me'], queryFn: () => userService.getCurrentUser() });
+  const [showVerifyModal, setShowVerifyModal] = useState(false);
+
+  const myPostCount = useMemo(() => posts?.filter((post: any) => post.user_id === me?.id).length || 0, [posts, me?.id]);
+  const profileCompleteness = useMemo(() => {
+    if (!me) return 0;
+    const checks = [
+      me.school_id,
+      me.department_id,
+      me.course_of_study,
+      me.graduation_date,
+      Array.isArray(me.personas) && me.personas.length > 0,
+      Array.isArray(me.skills) && me.skills.length >= 2,
+      me.bio && me.bio.length >= 20,
+    ];
+    return Math.round((checks.filter(Boolean).length / checks.length) * 100);
+  }, [me]);
+  const verificationReady = Boolean(me && !me.is_verified && myPostCount >= 3 && profileCompleteness >= 75);
+
+  useEffect(() => {
+    if (!verificationReady) return;
+    const key = `z-verify-nudge:${me?.id}`;
+    const lastShown = Number(window.localStorage.getItem(key) || 0);
+    if (Date.now() - lastShown < 1000 * 60 * 60 * 12) return;
+    const timeout = window.setTimeout(() => {
+      setShowVerifyModal(true);
+      window.localStorage.setItem(key, String(Date.now()));
+    }, 1800);
+    return () => window.clearTimeout(timeout);
+  }, [verificationReady, me?.id]);
 
   if (isLoading) {
     return (
@@ -143,12 +173,85 @@ function FeedList({ filter }: { filter: string }) {
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
+      {verificationReady && <VerificationBanner postCount={myPostCount} profileCompleteness={profileCompleteness} />}
+      <FeedPulseCards posts={posts} />
       <AnimatePresence mode="popLayout">
         {posts.map((post, i) => (
-          <PostCard key={post.id} post={post} index={i} />
+          <div key={post.id} className="space-y-6">
+            <PostCard post={post} index={i} />
+            {(i + 1) % 4 === 0 && <InlineDiscoveryCard posts={posts} index={i} />}
+          </div>
         ))}
       </AnimatePresence>
+      <AnimatePresence>
+        {showVerifyModal && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
+            <motion.div initial={{ scale: 0.94, y: 12 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.96, y: 8 }} className="w-full max-w-md rounded-[2rem] border border-accent/20 bg-background p-6 shadow-2xl">
+              <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-accent text-black"><BadgeCheck /></div>
+              <h3 className="text-2xl font-black uppercase tracking-tight">Verification check unlocked</h3>
+              <p className="mt-3 text-sm leading-6 text-foreground/60">You have {myPostCount} posts and your profile is {profileCompleteness}% complete. Finish live verification to build more trust on Zyng.</p>
+              <div className="mt-6 flex gap-3">
+                <button onClick={() => setShowVerifyModal(false)} className="flex-1 rounded-2xl border border-border bg-muted px-4 py-3 text-xs font-black uppercase tracking-widest">Later</button>
+                <Link href="/z-verify" className="flex-1 rounded-2xl bg-accent px-4 py-3 text-center text-xs font-black uppercase tracking-widest text-black">Verify</Link>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
+  );
+}
+
+function VerificationBanner({ postCount, profileCompleteness }: { postCount: number; profileCompleteness: number }) {
+  return (
+    <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} className="sticky top-2 z-20 rounded-2xl border border-accent/20 bg-background/95 p-3 shadow-xl shadow-black/10 backdrop-blur">
+      <div className="flex items-center gap-3">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-accent text-black"><BadgeCheck size={18} /></div>
+        <div className="min-w-0 flex-1">
+          <div className="text-xs font-black uppercase tracking-widest text-accent">Verification unlocked</div>
+          <div className="truncate text-xs text-foreground/60">{postCount} posts · profile {profileCompleteness}% complete</div>
+        </div>
+        <Link href="/z-verify" className="rounded-xl bg-accent px-3 py-2 text-[10px] font-black uppercase tracking-widest text-black">Verify</Link>
+      </div>
+    </motion.div>
+  );
+}
+
+function FeedPulseCards({ posts }: { posts: Post[] }) {
+  const hotTakes = posts.filter((post) => post.type === 'hot_take').length;
+  const comments = posts.reduce((sum, post: any) => sum + ((post.replies || []).length || 0), 0);
+  const activePeople = new Set(posts.map((post: any) => post.persona_id || post.user_id).filter(Boolean)).size;
+  const cards = [
+    { icon: Flame, label: 'Hot takes', value: hotTakes, accent: 'text-rose-400' },
+    { icon: Users, label: 'Zyngers active', value: activePeople, accent: 'text-sky-400' },
+    { icon: MessageSquare, label: 'Replies moving', value: comments, accent: 'text-emerald-400' },
+  ];
+  return (
+    <div className="grid grid-cols-3 gap-2">
+      {cards.map((card, index) => (
+        <motion.div key={card.label} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.05 }} className="rounded-2xl border border-border bg-muted/40 p-3">
+          <card.icon className={card.accent} size={18} />
+          <div className="mt-3 text-xl font-black">{card.value}</div>
+          <div className="text-[9px] font-black uppercase tracking-widest text-foreground/35">{card.label}</div>
+        </motion.div>
+      ))}
+    </div>
+  );
+}
+
+function InlineDiscoveryCard({ posts, index }: { posts: Post[]; index: number }) {
+  const sample = posts[index % posts.length];
+  return (
+    <motion.div initial={{ opacity: 0, scale: 0.98 }} whileInView={{ opacity: 1, scale: 1 }} viewport={{ once: true }} className="rounded-[2rem] border border-accent/20 bg-gradient-to-br from-accent/10 via-muted/40 to-background p-5">
+      <div className="flex items-start gap-4">
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-background text-accent"><Sparkles /></div>
+        <div className="min-w-0 flex-1">
+          <div className="text-xs font-black uppercase tracking-widest text-accent">Campus hint</div>
+          <p className="mt-2 text-sm leading-6 text-foreground/70">Jump into a thread, react to a take, or drop a quick poll. Posts like <span className="font-black text-foreground">{sample?.type || 'regular'}</span> are shaping the feed right now.</p>
+        </div>
+        <Link href="/z-events" className="hidden rounded-xl border border-border bg-background px-3 py-2 text-[10px] font-black uppercase tracking-widest text-foreground/60 sm:inline-flex"><CalendarDays size={14} /> Events</Link>
+      </div>
+    </motion.div>
   );
 }
 

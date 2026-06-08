@@ -66,11 +66,45 @@ const audioDataUrl = (base64Audio: string, mimeType: string) => {
   return `data:audio/wav;base64,${wav.toString('base64')}`;
 };
 
+const synthesizeWithVoiceBackend = async (text: string, lowLatency: boolean) => {
+  const baseUrl = process.env.Z_VOICE_API_URL?.trim();
+  if (!baseUrl) return null;
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), lowLatency ? 5000 : 9000);
+  try {
+    const response = await fetch(`${baseUrl.replace(/\/$/, '')}/tts`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, rate: lowLatency ? 205 : 180 }),
+      signal: controller.signal,
+    });
+    const contentType = response.headers.get('content-type') || '';
+    if (!contentType.includes('application/json')) throw new Error(`Voice backend returned ${response.status}`);
+    const json = await response.json();
+    if (!response.ok || !json.audio) throw new Error(json.detail || json.error || 'Voice backend TTS failed');
+    return {
+      audio: json.audio as string,
+      model: `z-voice:${json.engine || 'backend'}`,
+    };
+  } finally {
+    clearTimeout(timeout);
+  }
+};
+
 export async function POST(request: Request) {
   try {
     const { text, lowLatency } = await request.json();
     const cleanText = String(text || '').replace(/\*\*/g, '').trim();
     if (!cleanText) return NextResponse.json({ error: 'Missing text' }, { status: 400 });
+    const maxChars = lowLatency ? 280 : 3500;
+
+    try {
+      const backendAudio = await synthesizeWithVoiceBackend(cleanText.slice(0, maxChars), Boolean(lowLatency));
+      if (backendAudio) return NextResponse.json(backendAudio);
+    } catch (error) {
+      console.warn('Z voice backend failed, falling back to Google TTS', error);
+    }
 
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) return NextResponse.json({ error: 'Gemini voice is not configured' }, { status: 503 });
@@ -78,8 +112,6 @@ export async function POST(request: Request) {
     const ai = new GoogleGenAI({ apiKey });
 
     const models = lowLatency ? LIVE_TTS_MODELS : TTS_MODELS;
-    const maxChars = lowLatency ? 280 : 3500;
-
     for (const model of models) {
       try {
         const response = await ai.models.generateContent({

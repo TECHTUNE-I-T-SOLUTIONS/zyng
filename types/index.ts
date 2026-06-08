@@ -47,6 +47,7 @@ export interface User {
   portfolio_data?: any;
   
   trust_score: number;
+  is_verified?: boolean;
   referral_code?: string;
   referred_by?: string;
   school?: School;

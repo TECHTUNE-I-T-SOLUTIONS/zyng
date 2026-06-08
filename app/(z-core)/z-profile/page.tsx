@@ -7,7 +7,7 @@ import { userService } from '@/lib/services/userService';
 import { postService } from '@/lib/services/postService';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useToast } from '@/components/toast';
-import { Pencil, Shield, LogOut, Award, Users, BookOpen, Loader2, X, BadgeCheck } from 'lucide-react';
+import { Pencil, Shield, LogOut, Award, Users, BookOpen, Loader2, X, BadgeCheck, Trash2 } from 'lucide-react';
 import { supabase } from '@/lib/db/supabase';
 
 export default function ProfilePage() {
@@ -35,6 +35,7 @@ export default function ProfilePage() {
   const profileUser = user as any;
   const [editingPost, setEditingPost] = useState<any | null>(null);
   const [editContent, setEditContent] = useState<string>('');
+  const [deletingPost, setDeletingPost] = useState<any | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -120,7 +121,15 @@ export default function ProfilePage() {
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => postService.deletePost(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['posts', 'me'] }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['posts', 'me'] });
+      toast.show('Post deleted', 'success');
+      setDeletingPost(null);
+    },
+    onError: (error) => {
+      console.error('Delete post failed', error);
+      toast.show('Delete failed', 'error');
+    },
   });
 
   const profileMutation = useMutation({
@@ -437,7 +446,7 @@ export default function ProfilePage() {
                             </div>
                             <div className="mt-4 flex gap-2">
                               <button onClick={() => { setEditingPost(p); setEditContent(p.content); }} className="text-xs font-black uppercase text-foreground/40 hover:text-accent">Edit</button>
-                              <button onClick={async () => { if (confirm('Delete this post?')) await deleteMutation.mutateAsync(p.id); }} className="text-xs font-black uppercase text-red-500">Delete</button>
+                              <button onClick={() => setDeletingPost(p)} className="text-xs font-black uppercase text-red-500 hover:text-red-400">Delete</button>
                             </div>
                           </div>
 
@@ -565,6 +574,67 @@ export default function ProfilePage() {
                   onClick={() => setShowLogoutModal(false)}
                 >
                   Stay in Zyng
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Delete Post Confirmation Modal */}
+      <AnimatePresence>
+        {deletingPost && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setDeletingPost(null)}
+              className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.92, y: 18 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.92, y: 18 }}
+              className="relative w-full max-w-md overflow-hidden rounded-[2rem] border border-red-500/20 bg-background p-7 text-center shadow-2xl shadow-black/40"
+            >
+              <button
+                title="Close delete confirmation"
+                onClick={() => setDeletingPost(null)}
+                disabled={deleteMutation.isPending}
+                className="absolute right-5 top-5 text-foreground/30 transition-colors hover:text-foreground disabled:opacity-40"
+              >
+                <X size={20} />
+              </button>
+
+              <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-red-500/10 text-red-500">
+                <Trash2 size={30} />
+              </div>
+              <h2 className="mb-2 text-2xl font-black uppercase tracking-tight text-foreground">Delete Post?</h2>
+              <p className="mx-auto mb-5 max-w-sm text-sm font-medium leading-6 text-foreground/45">
+                This will permanently remove the post from your profile and the feed. This action cannot be undone.
+              </p>
+              {deletingPost.content && (
+                <div className="mb-6 max-h-24 overflow-hidden rounded-2xl border border-border bg-muted/40 p-4 text-left text-sm leading-6 text-foreground/70">
+                  {deletingPost.content}
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <button
+                  onClick={() => setDeletingPost(null)}
+                  disabled={deleteMutation.isPending}
+                  className="rounded-2xl bg-muted px-4 py-3 text-xs font-black uppercase tracking-widest text-foreground/50 transition-colors hover:text-foreground disabled:opacity-40"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => deleteMutation.mutateAsync(deletingPost.id)}
+                  disabled={deleteMutation.isPending}
+                  className="inline-flex items-center justify-center gap-2 rounded-2xl bg-red-500 px-4 py-3 text-xs font-black uppercase tracking-widest text-white shadow-lg shadow-red-500/20 transition-colors hover:bg-red-600 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {deleteMutation.isPending ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+                  Delete
                 </button>
               </div>
             </motion.div>

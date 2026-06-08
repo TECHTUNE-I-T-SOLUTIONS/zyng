@@ -20,6 +20,11 @@ type Position = {
   y: number;
 };
 
+type MobilePosition = {
+  side: 'left' | 'right';
+  y: number;
+};
+
 type NavigationTarget = {
   label: string;
   path: string;
@@ -55,6 +60,7 @@ declare global {
 }
 
 const Z_CREATE_DRAFT_EVENT = 'z:create-draft';
+const Z_SUBMIT_DRAFT_EVENT = 'z:submit-draft';
 
 const getDefaultPosition = (): Position => {
   if (typeof window === 'undefined') return { x: 16, y: 220 };
@@ -62,6 +68,27 @@ const getDefaultPosition = (): Position => {
     x: Math.max(12, window.innerWidth - 78),
     y: Math.max(88, window.innerHeight - 132),
   };
+};
+
+const getDefaultMobilePosition = (): MobilePosition => ({
+  side: 'right',
+  y: typeof window === 'undefined' ? 0 : Math.max(96, window.innerHeight - 142),
+});
+
+const getStoredMobilePosition = (userId?: string): MobilePosition => {
+  if (typeof window === 'undefined' || !userId) return getDefaultMobilePosition();
+  try {
+    const stored = window.localStorage.getItem(`z-assistant-mobile-position:${userId}`);
+    const parsed = stored ? JSON.parse(stored) : null;
+    return {
+      side: parsed?.side === 'left' ? 'left' : 'right',
+      y: typeof parsed?.y === 'number'
+        ? Math.max(88, Math.min(parsed.y, window.innerHeight - 96))
+        : getDefaultMobilePosition().y,
+    };
+  } catch {
+    return getDefaultMobilePosition();
+  }
 };
 
 const buildProactiveLine = (context: any) => {
@@ -122,6 +149,31 @@ const isAffirmative = (text: string) => /^(yes|yeah|yep|sure|ok|okay|please|take
 
 const isDirectNavigationRequest = (text: string) => /\b(take me|go to|open|navigate|show me|bring me)\b/i.test(text);
 
+const isVerifyActionRequest = (text: string) => /\b(verify|verification|verified|account check|verification check)\b/i.test(text)
+  && /\b(select|click|press|choose|start|open|continue|help me|take me|go)\b/i.test(text);
+
+const clickVisibleVerifyAction = () => {
+  if (typeof window === 'undefined') return false;
+  const candidates = Array.from(document.querySelectorAll<HTMLAnchorElement | HTMLButtonElement>('a, button'));
+  const target = candidates.find((element) => {
+    const rect = element.getBoundingClientRect();
+    const style = window.getComputedStyle(element);
+    const visible = rect.width > 0
+      && rect.height > 0
+      && rect.bottom > 0
+      && rect.top < window.innerHeight
+      && style.display !== 'none'
+      && style.visibility !== 'hidden'
+      && Number(style.opacity) !== 0;
+    if (!visible) return false;
+    const text = `${element.textContent || ''} ${element.getAttribute('aria-label') || ''} ${element.getAttribute('title') || ''}`.toLowerCase();
+    const href = element instanceof HTMLAnchorElement ? element.getAttribute('href') || '' : '';
+    return href.includes('/z-verify') || /\bverify( account| now)?\b/.test(text) || text.includes('verification');
+  });
+  target?.click();
+  return Boolean(target);
+};
+
 const postTypeFromText = (text: string): PostType => {
   const normalized = text.toLowerCase();
   if (/\bpoll|vote|options?\b/.test(normalized)) return 'poll';
@@ -135,6 +187,9 @@ const isCreatePostRequest = (text: string) => /\b(create|write|draft|make|post)\
   || /\b(i wanna|i want to|help me)\b.*\b(create|write|draft|make|put it|fill)\b/i.test(text)
   || /\bput it\b.*\b(field|create|post)\b/i.test(text);
 
+const isSubmitPostRequest = (text: string) => /\b(post|publish|submit|send)\b.*\b(it|this|draft|post|zyng)\b/i.test(text)
+  || /\b(go ahead|yes|okay|ok)\b.*\b(post|publish|submit)\b/i.test(text);
+
 const buildCreatePath = (text: string, draftId?: string) => {
   const params = new URLSearchParams();
   params.set('zDraft', draftId || '1');
@@ -145,6 +200,10 @@ const buildCreatePath = (text: string, draftId?: string) => {
 
 const dispatchCreateDraft = (draft: PostDraft) => {
   window.dispatchEvent(new CustomEvent(Z_CREATE_DRAFT_EVENT, { detail: draft }));
+};
+
+const dispatchSubmitDraft = () => {
+  window.dispatchEvent(new CustomEvent(Z_SUBMIT_DRAFT_EVENT));
 };
 
 const renderMarkdown = (content: string) => {
@@ -193,13 +252,16 @@ export function ZAssistant({ user }: ZAssistantProps) {
   const [listening, setListening] = useState(false);
   const [callActive, setCallActive] = useState(false);
   const [voiceStatus, setVoiceStatus] = useState('');
+  const [isCompactViewport, setIsCompactViewport] = useState(false);
   const [pendingNavigation, setPendingNavigation] = useState<NavigationTarget | null>(null);
   const [voiceSupported] = useState(() => (
     typeof window !== 'undefined' && Boolean(window.SpeechRecognition || window.webkitSpeechRecognition)
   ));
   const [position, setPosition] = useState<Position>(() => getDefaultPosition());
+  const [mobilePosition, setMobilePosition] = useState<MobilePosition>(() => getStoredMobilePosition(user?.id));
   const [dragging, setDragging] = useState(false);
   const dragOffsetRef = useRef<Position>({ x: 0, y: 0 });
+  const mobileDragStartRef = useRef<MobilePosition>({ side: 'right', y: 0 });
   const dragMovedRef = useRef(false);
   const positionRef = useRef<Position>(getDefaultPosition());
   const recognitionRef = useRef<SpeechRecognition | null>(null);
@@ -207,6 +269,7 @@ export function ZAssistant({ user }: ZAssistantProps) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const awaitingLiveReplyRef = useRef(false);
   const draftCounterRef = useRef(0);
+  const latestDraftRef = useRef<PostDraft | null>(null);
 
   const isInteractiveTarget = (target: EventTarget | null) => (
     target instanceof HTMLElement
@@ -252,6 +315,12 @@ export function ZAssistant({ user }: ZAssistantProps) {
   }, []);
 
   useEffect(() => {
+    if (!showNudge || open) return;
+    const timeout = window.setTimeout(() => setShowNudge(false), 5000);
+    return () => window.clearTimeout(timeout);
+  }, [open, showNudge]);
+
+  useEffect(() => {
     if (!user?.id) return;
     try {
       const stored = window.localStorage.getItem(`z-assistant-position:${user.id}`);
@@ -277,6 +346,16 @@ export function ZAssistant({ user }: ZAssistantProps) {
 
   useEffect(() => {
     const clampToViewport = () => {
+      const compact = window.innerWidth < 768;
+      setIsCompactViewport(compact);
+      if (compact) {
+        setMobilePosition((current) => {
+          const next = { ...current, y: Math.max(88, Math.min(current.y || getDefaultMobilePosition().y, window.innerHeight - 96)) };
+          mobileDragStartRef.current = next;
+          return next;
+        });
+        return;
+      }
       const next = {
         x: Math.max(12, Math.min(positionRef.current.x, window.innerWidth - 72)),
         y: Math.max(88, Math.min(positionRef.current.y, window.innerHeight - 112)),
@@ -305,6 +384,11 @@ export function ZAssistant({ user }: ZAssistantProps) {
     event.currentTarget.setPointerCapture(event.pointerId);
     setDragging(true);
     dragMovedRef.current = false;
+    if (isCompactViewport) {
+      mobileDragStartRef.current = mobilePosition;
+      dragOffsetRef.current = { x: event.clientX, y: event.clientY - mobilePosition.y };
+      return;
+    }
     dragOffsetRef.current = {
       x: event.clientX - position.x,
       y: event.clientY - position.y,
@@ -313,6 +397,16 @@ export function ZAssistant({ user }: ZAssistantProps) {
 
   const moveDrag = (event: ReactPointerEvent<HTMLElement>) => {
     if (!dragging) return;
+    if (isCompactViewport) {
+      const next: MobilePosition = {
+        side: mobileDragStartRef.current.side,
+        y: Math.max(88, Math.min(event.clientY - dragOffsetRef.current.y, window.innerHeight - 96)),
+      };
+      if (Math.abs(next.y - mobilePosition.y) > 2) dragMovedRef.current = true;
+      setMobilePosition(next);
+      mobileDragStartRef.current = next;
+      return;
+    }
     const next = {
       x: Math.max(8, Math.min(event.clientX - dragOffsetRef.current.x, window.innerWidth - 72)),
       y: Math.max(88, Math.min(event.clientY - dragOffsetRef.current.y, window.innerHeight - 112)),
@@ -327,6 +421,10 @@ export function ZAssistant({ user }: ZAssistantProps) {
   const endDrag = () => {
     if (!dragging) return;
     setDragging(false);
+    if (isCompactViewport) {
+      if (user?.id) window.localStorage.setItem(`z-assistant-mobile-position:${user.id}`, JSON.stringify(mobileDragStartRef.current));
+      return;
+    }
     persistPosition(positionRef.current);
   };
 
@@ -335,8 +433,17 @@ export function ZAssistant({ user }: ZAssistantProps) {
     setOpen(false);
     setShowNudge(false);
     setVoiceStatus(`Taking you to ${target.label}...`);
+    window.speechSynthesis?.cancel();
+    audioRef.current?.pause();
     router.push(target.path);
     window.setTimeout(() => setVoiceStatus(''), 1200);
+  };
+
+  const stopSpeaking = () => {
+    window.speechSynthesis?.cancel();
+    audioRef.current?.pause();
+    audioRef.current = null;
+    setVoiceStatus((status) => (status.includes('speaking') || status.includes('Preparing') ? '' : status));
   };
 
   const draftPost = async (text: string): Promise<PostDraft | null> => {
@@ -371,6 +478,36 @@ export function ZAssistant({ user }: ZAssistantProps) {
       navigateTo(pendingNavigation);
       return;
     }
+    if (isVerifyActionRequest(clean)) {
+      const clicked = clickVisibleVerifyAction();
+      const nextMessages: Message[] = [
+        ...messages,
+        { role: 'user', content: clean },
+        { role: 'assistant', content: clicked ? 'Selecting **Verify** for you now.' : 'Opening **Verification** for you now.' },
+      ];
+      setMessages(nextMessages);
+      setInput('');
+      if (!clicked) navigateTo({ label: 'Verification', path: '/z-verify' });
+      return;
+    }
+    if (isSubmitPostRequest(clean)) {
+      setMessages([
+        ...messages,
+        { role: 'user', content: clean },
+        { role: 'assistant', content: 'Posting it now.' },
+      ]);
+      setInput('');
+      if (window.location.pathname !== '/z-create') {
+        navigateTo({ label: 'Create', path: '/z-create' });
+        if (latestDraftRef.current) {
+          window.setTimeout(() => dispatchCreateDraft(latestDraftRef.current as PostDraft), 350);
+          window.setTimeout(dispatchSubmitDraft, 900);
+        }
+        return;
+      }
+      dispatchSubmitDraft();
+      return;
+    }
     if (isCreatePostRequest(clean)) {
       setLoading(true);
       setMessages([
@@ -383,6 +520,7 @@ export function ZAssistant({ user }: ZAssistantProps) {
       draftCounterRef.current += 1;
       const draftId = `z-draft-${user.id}-${draftCounterRef.current}`;
       if (draft) {
+        latestDraftRef.current = draft;
         window.sessionStorage.setItem(draftId, JSON.stringify(draft));
       }
       setLoading(false);
@@ -472,6 +610,7 @@ export function ZAssistant({ user }: ZAssistantProps) {
 
   const startListening = (live = true) => {
     if (!voiceSupported || listening || loading) return;
+    stopSpeaking();
     const SpeechRecognitionClass = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognitionClass) return;
     liveVoiceRef.current = live;
@@ -519,8 +658,7 @@ export function ZAssistant({ user }: ZAssistantProps) {
     liveVoiceRef.current = false;
     setCallActive(false);
     recognitionRef.current?.stop();
-    window.speechSynthesis?.cancel();
-    audioRef.current?.pause();
+    stopSpeaking();
     setListening(false);
     setVoiceStatus('');
   };
@@ -545,7 +683,7 @@ export function ZAssistant({ user }: ZAssistantProps) {
   return (
     <div
       className="fixed z-50 flex flex-col items-end"
-      style={{ left: position.x, top: position.y }}
+      style={isCompactViewport ? { [mobilePosition.side]: 12, top: mobilePosition.y } : { left: position.x, top: position.y }}
     >
       <AnimatePresence>
         {showNudge && !open && (
@@ -558,7 +696,7 @@ export function ZAssistant({ user }: ZAssistantProps) {
               setOpen(true);
               setShowNudge(false);
             }}
-            className="mb-3 mr-16 max-w-[min(280px,calc(100vw-6rem))] rounded-2xl border border-accent/20 bg-background p-3 text-left text-xs font-semibold leading-5 text-foreground shadow-2xl shadow-black/20"
+            className="mb-3 mr-12 max-w-[min(280px,calc(100vw-5rem))] rounded-2xl border border-accent/20 bg-background p-3 text-left text-xs font-semibold leading-5 text-foreground shadow-2xl shadow-black/20 sm:mr-14"
           >
             <span className="mb-1 block text-[10px] font-black uppercase tracking-widest text-accent">Z noticed</span>
             {proactiveLine}
@@ -572,7 +710,7 @@ export function ZAssistant({ user }: ZAssistantProps) {
             initial={{ opacity: 0, x: 18, scale: 0.96 }}
             animate={{ opacity: 1, x: 0, scale: 1 }}
             exit={{ opacity: 0, x: 18, scale: 0.96 }}
-            className="mr-16 w-[min(360px,calc(100vw-5.5rem))] overflow-hidden rounded-3xl border border-border bg-background shadow-2xl shadow-black/30"
+            className="mr-12 w-[min(360px,calc(100vw-4.75rem))] overflow-hidden rounded-3xl border border-border bg-background shadow-2xl shadow-black/30 sm:mr-14 sm:w-[min(360px,calc(100vw-5.5rem))]"
           >
             <div
               className="flex cursor-grab touch-none items-center justify-between border-b border-border p-4 active:cursor-grabbing"
@@ -718,11 +856,11 @@ export function ZAssistant({ user }: ZAssistantProps) {
           setOpen((value) => !value);
           setShowNudge(false);
         }}
-        className={`flex h-14 w-14 cursor-grab touch-none items-center justify-center rounded-full bg-accent text-xl font-black text-black shadow-2xl shadow-accent/20 transition-transform hover:scale-105 active:cursor-grabbing ${callActive ? 'animate-pulse ring-4 ring-accent/30' : ''}`}
+        className={`flex h-10 w-10 cursor-grab touch-none items-center justify-center rounded-full bg-accent text-xl font-black text-black shadow-2xl shadow-accent/20 transition-transform hover:scale-105 active:cursor-grabbing sm:h-11 sm:w-11 ${callActive ? 'animate-pulse ring-4 ring-accent/30' : ''}`}
         aria-label={callActive ? 'Z call is live. Open or drag Z assistant.' : 'Open or drag Z assistant'}
         title={callActive ? 'Z call is live. Click to open, drag to reposition.' : 'Click to open. Drag to reposition.'}
       >
-        <Image src="/logo.png" alt="Z" width={36} height={36} draggable={false} className="pointer-events-none select-none object-contain brightness-0" />
+        <Image src="/logo.png" alt="Z" width={26} height={26} draggable={false} className="pointer-events-none select-none object-contain brightness-0 sm:h-7 sm:w-7" />
       </button>
     </div>
   );

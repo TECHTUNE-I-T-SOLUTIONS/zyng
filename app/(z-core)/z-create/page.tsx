@@ -17,6 +17,13 @@ import { ACTIVE_PERSONA_ALERT, getActivePersona } from '@/lib/persona-utils';
 type PostType = 'regular' | 'confession' | 'poll' | 'hot_take' | 'missed_connection';
 
 const Z_CREATE_DRAFT_EVENT = 'z:create-draft';
+const Z_SUBMIT_DRAFT_EVENT = 'z:submit-draft';
+const dataUrlFromBlob = (blob: Blob) => new Promise<string>((res, rej) => {
+  const fr = new FileReader();
+  fr.onload = () => res(fr.result as string);
+  fr.onerror = rej;
+  fr.readAsDataURL(blob);
+});
 
 export default function ZCreate() {
   const router = useRouter();
@@ -59,6 +66,7 @@ export default function ZCreate() {
   const [pollOptions, setPollOptions] = useState<string[]>(assistantDraft?.type === 'poll' ? assistantDraft.pollOptions : ['', '']);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const appliedDraftRef = useRef<string | null>(null);
+  const submitInFlightRef = useRef(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const { data: user, isLoading: userLoading } = useQuery({ queryKey: ['me'], queryFn: () => userService.getCurrentUser() });
@@ -123,6 +131,7 @@ export default function ZCreate() {
   }, [applyAssistantDraft, searchParams]);
 
   const handleSubmit = async () => {
+    if (submitInFlightRef.current) return;
     // validate early and show feedback if missing
     if (!content.trim()) {
       show('Please enter some content for your Zyng.', 'error');
@@ -137,6 +146,7 @@ export default function ZCreate() {
       return;
     }
 
+    submitInFlightRef.current = true;
     setIsSubmitting(true);
     try {
       // If there are selected images, upload them concurrently first
@@ -183,6 +193,7 @@ export default function ZCreate() {
         type: activeType,
         content,
         hashtag: hashtag || null,
+        poll_options: activeType === 'poll' ? pollOptions.filter((o) => o && o.trim()) : undefined,
         media_url: uploadedUrls[0] || mediaUrl || null,
         media_urls: uploadedUrls.length ? uploadedUrls : mediaUrl ? [mediaUrl] : null,
         poll: activeType === 'poll' ? { question: content, options: pollOptions.filter((o) => o && o.trim()) } : undefined,
@@ -192,19 +203,20 @@ export default function ZCreate() {
       console.error('Failed to create post', err);
       show('Failed to create post. Please try again.', 'error');
     } finally {
+      submitInFlightRef.current = false;
       setIsSubmitting(false);
     }
   };
 
-  const handleFilePick = () => fileInputRef.current?.click();
+  useEffect(() => {
+    const handleSubmitDraft = () => {
+      void handleSubmit();
+    };
+    window.addEventListener(Z_SUBMIT_DRAFT_EVENT, handleSubmitDraft);
+    return () => window.removeEventListener(Z_SUBMIT_DRAFT_EVENT, handleSubmitDraft);
+  }, [content, activePersona?.id, user?.id, user?.school_id, activeType, hashtag, mediaUrl, selectedImages, pollOptions, uploading, userLoading]);
 
-  // helpers for compression and conversion
-  const dataUrlFromBlob = (blob: Blob) => new Promise<string>((res, rej) => {
-    const fr = new FileReader();
-    fr.onload = () => res(fr.result as string);
-    fr.onerror = rej;
-    fr.readAsDataURL(blob);
-  });
+  const handleFilePick = () => fileInputRef.current?.click();
 
   const compressImage = async (file: File) => {
     const originalDataUrl = await new Promise<string>((res, rej) => {

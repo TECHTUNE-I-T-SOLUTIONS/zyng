@@ -1,13 +1,15 @@
 'use client';
 
 import { useState, useRef } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Loader2, PlusCircle, ShieldCheck, CheckSquare2, Square, Trash2, UserCircle, X, Image as ImageIcon, Upload, AlertTriangle } from 'lucide-react';
 import { userService } from '@/lib/services/userService';
 import { createPersona, getPersonas, setActivePersona, updatePersonaAvatar, clearAllPersonas } from '@/lib/services/persona';
 import { cn } from '@/lib/utils';
+import type { Persona } from '@/types';
 
 export default function ZPersonas() {
+  const queryClient = useQueryClient();
   const [isCreating, setIsCreating] = useState(false);
   const [newPersonaName, setNewPersonaName] = useState('');
   const [newPersonaAvatar, setNewPersonaAvatar] = useState('');
@@ -94,8 +96,17 @@ export default function ZPersonas() {
     setUpdatingPersonaAvatarId(personaId);
     try {
       const url = await uploadAvatar(file);
-      await updatePersonaAvatar(personaId, url);
+      const { error } = await updatePersonaAvatar(personaId, url);
+      if (error) throw error;
+      const withUpdatedAvatar = (items: Persona[] = []) => items.map((persona) => (
+        persona.id === personaId ? { ...persona, avatar_url: url } : persona
+      ));
+      queryClient.setQueryData<Persona[]>(['personas', user?.id], (current: Persona[] | undefined) => withUpdatedAvatar(current || personas));
+      queryClient.setQueryData<any>(['me'], (current: any) => (
+        current ? { ...current, personas: withUpdatedAvatar(current.personas || []) } : current
+      ));
       await refetch();
+      await queryClient.invalidateQueries({ queryKey: ['me'] });
     } finally {
       setUpdatingPersonaAvatarId(null);
       avatarTargetPersonaIdRef.current = null;
@@ -117,7 +128,7 @@ export default function ZPersonas() {
   };
 
   return (
-    <div className="flex-1 flex flex-col bg-background">
+    <div className="flex-1 flex flex-col bg-background pb-16">
       <header className="h-16 border-b border-border flex items-center justify-between px-8 bg-background/80 backdrop-blur-md sticky top-0 z-10">
         <h1 className="text-sm font-black uppercase tracking-widest text-accent">Persona Manager</h1>
         <button
@@ -133,6 +144,15 @@ export default function ZPersonas() {
       </header>
 
       <div className="flex-1 p-6 md:p-12 overflow-y-auto">
+        <input
+          ref={avatarInputRef}
+          type="file"
+          accept="image/*"
+          title="Upload existing persona avatar"
+          aria-label="Upload existing persona avatar"
+          className="hidden"
+          onChange={(e) => handleExistingAvatarPick(e.target.files?.[0] || null)}
+        />
         <div className="max-w-xl mx-auto space-y-10">
           <section>
             <h2 className="text-[10px] font-black uppercase tracking-[0.2em] text-foreground/20 mb-6">Active Identities</h2>

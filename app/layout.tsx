@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import './globals.css'; // Global styles
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'),
   title: 'Zyng',
   description: 'A campus-exclusive, semi-anonymous social platform.',
   manifest: '/manifest.json',

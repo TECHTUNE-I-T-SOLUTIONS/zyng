@@ -223,7 +223,7 @@ export default function PostPageClient() {
   }
 
   return (
-    <div className="flex-1 overflow-y-auto bg-background p-4 md:p-6">
+    <div className="flex-1 overflow-y-auto bg-background p-4 md:p-6 pb-18">
       <div className="mx-auto max-w-2xl">
         <button onClick={() => router.back()} className="mb-8 flex items-center gap-2 text-foreground/40 hover:text-foreground group transition-all">
           <ArrowLeft size={20} className="group-hover:-translate-x-1 transition-transform" />

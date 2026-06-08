@@ -1,32 +1,32 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { jwtVerify } from 'jose';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+const supabaseAdmin = createClient(supabaseUrl, serviceKey);
 
-async function getUserIdFromCookie(request: Request) {
+async function getUserIdFromRequest(request: Request) {
   const cookie = request.headers.get('cookie') || '';
-  const match = cookie.match(/sb-access-token=([^;]+)/);
-  if (!match) return null;
-  const token = decodeURIComponent(match[1]);
-  const secret = new TextEncoder().encode(process.env.SUPABASE_JWT_SECRET || '');
+  const cookieMatch = cookie.match(/sb-access-token=([^;]+)/);
+  const bearerMatch = request.headers.get('authorization')?.match(/^Bearer\s+(.+)$/i);
+  const token = cookieMatch ? decodeURIComponent(cookieMatch[1]) : bearerMatch?.[1];
+  if (!token) return null;
   try {
-    const { payload } = await jwtVerify(token, secret);
-    return payload.sub as string | null;
+    const { data, error } = await supabaseAdmin.auth.getUser(token);
+    if (error) throw error;
+    return data.user?.id || null;
   } catch (err) {
-    console.error('personas route token verify failed', err);
+    console.error('personas route auth lookup failed', err);
     return null;
   }
 }
 
 export async function GET(request: Request) {
   try {
-    const userId = await getUserIdFromCookie(request);
+    const userId = await getUserIdFromRequest(request);
     if (!userId) return NextResponse.json({ data: [] });
 
-    const supabase = createClient(supabaseUrl, serviceKey);
-    const { data, error } = await supabase.from('personas').select('id, user_id, name, avatar_url, reputation, is_active, created_at').eq('user_id', userId);
+    const { data, error } = await supabaseAdmin.from('personas').select('id, user_id, name, avatar_url, reputation, is_active, created_at').eq('user_id', userId);
     if (error) {
       console.error('personas GET error', error);
       return NextResponse.json({ data: [] }, { status: 500 });
@@ -40,7 +40,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const userId = await getUserIdFromCookie(request);
+    const userId = await getUserIdFromRequest(request);
     if (!userId) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
 
     const body = await request.json();
@@ -48,8 +48,7 @@ export async function POST(request: Request) {
     const avatarUrl = body?.avatar_url;
     if (!name || typeof name !== 'string') return NextResponse.json({ error: 'Missing name' }, { status: 400 });
 
-    const supabase = createClient(supabaseUrl, serviceKey);
-    const { count, error: countError } = await supabase
+    const { count, error: countError } = await supabaseAdmin
       .from('personas')
       .select('id', { count: 'exact', head: true })
       .eq('user_id', userId);
@@ -63,7 +62,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Persona limit reached' }, { status: 400 });
     }
 
-    const { data, error } = await supabase.from('personas').insert([{ user_id: userId, name, avatar_url: typeof avatarUrl === 'string' && avatarUrl.trim() ? avatarUrl.trim() : null }]).select();
+    const { data, error } = await supabaseAdmin.from('personas').insert([{ user_id: userId, name, avatar_url: typeof avatarUrl === 'string' && avatarUrl.trim() ? avatarUrl.trim() : null }]).select();
     if (error) {
       console.error('personas POST error', error);
       return NextResponse.json({ error: 'Insert failed' }, { status: 500 });
@@ -77,7 +76,7 @@ export async function POST(request: Request) {
 
 export async function PATCH(request: Request) {
   try {
-    const userId = await getUserIdFromCookie(request);
+    const userId = await getUserIdFromRequest(request);
     if (!userId) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
 
     const body = await request.json();
@@ -88,10 +87,8 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: 'Missing personaId' }, { status: 400 });
     }
 
-    const supabase = createClient(supabaseUrl, serviceKey);
-
     if (typeof avatarUrl === 'string') {
-      const { data, error } = await supabase
+      const { data, error } = await supabaseAdmin
         .from('personas')
         .update({ avatar_url: avatarUrl.trim() || null })
         .eq('id', personaId)
@@ -108,7 +105,7 @@ export async function PATCH(request: Request) {
     }
 
     if (makeActive === false) {
-      const { data, error } = await supabase
+      const { data, error } = await supabaseAdmin
         .from('personas')
         .update({ is_active: false })
         .eq('id', personaId)
@@ -124,7 +121,7 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ data });
     }
 
-    const { error: deactivateError } = await supabase
+    const { error: deactivateError } = await supabaseAdmin
       .from('personas')
       .update({ is_active: false })
       .eq('user_id', userId);
@@ -134,7 +131,7 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: 'Deactivate failed' }, { status: 500 });
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await supabaseAdmin
       .from('personas')
       .update({ is_active: true })
       .eq('id', personaId)
@@ -156,11 +153,10 @@ export async function PATCH(request: Request) {
 
 export async function DELETE(request: Request) {
   try {
-    const userId = await getUserIdFromCookie(request);
+    const userId = await getUserIdFromRequest(request);
     if (!userId) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
 
-    const supabase = createClient(supabaseUrl, serviceKey);
-    const { error } = await supabase.from('personas').delete().eq('user_id', userId);
+    const { error } = await supabaseAdmin.from('personas').delete().eq('user_id', userId);
     if (error) {
       console.error('personas DELETE error', error);
       return NextResponse.json({ error: 'Delete failed' }, { status: 500 });

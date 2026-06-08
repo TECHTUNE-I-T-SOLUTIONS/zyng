@@ -39,7 +39,7 @@ export const postService = {
 
     const { data, error } = await query;
     if (error) throw error;
-    return onlyActivePersonaOwners(data || []);
+    return onlyActivePersonaOwners((data || []) as any[]);
   },
 
   async getPostById(id: string) {
@@ -84,7 +84,7 @@ export const postService = {
       .single();
 
     if (error) throw error;
-    return onlyActivePersonaOwners(data || []);
+    return data;
   },
 
   async reactToPost(postId: string, userId: string, type: string) {

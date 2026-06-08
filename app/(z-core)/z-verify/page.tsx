@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Camera, FileBadge, Loader2, ShieldCheck, Square, Upload, Video } from 'lucide-react';
 import { userService } from '@/lib/services/userService';
@@ -8,13 +8,15 @@ import { verificationService } from '@/lib/services/verificationService';
 
 const challenges = [
   'Zyng verifies real campus people.',
+  'I am a real person on Zyng.',
+  'I am a Zynger',
   'My school identity belongs to me.',
   'Today I am verifying my Zyng account.',
 ];
 
 export default function VerifyPage() {
   const { data: user } = useQuery({ queryKey: ['me'], queryFn: () => userService.getCurrentUser() });
-  const [challenge] = useState(() => challenges[Math.floor(Math.random() * challenges.length)]);
+  const [challenge, setChallenge] = useState(challenges[0]);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [recorder, setRecorder] = useState<MediaRecorder | null>(null);
   const [videoBlob, setVideoBlob] = useState<Blob | null>(null);
@@ -23,14 +25,81 @@ export default function VerifyPage() {
   const [idPreview, setIdPreview] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [notice, setNotice] = useState('');
+  const [faceDetected, setFaceDetected] = useState(false);
+  const [motionDetected, setMotionDetected] = useState(false);
+  const [phraseHeard, setPhraseHeard] = useState(false);
+  const [transcript, setTranscript] = useState('');
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const idRef = useRef<HTMLInputElement | null>(null);
   const chunks = useRef<Blob[]>([]);
+  const recognitionRef = useRef<any>(null);
+  const precheckTimerRef = useRef<number | null>(null);
+  const previousFrameRef = useRef<ImageData | null>(null);
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      setChallenge(challenges[Math.floor(Math.random() * challenges.length)]);
+    }, 0);
+    return () => window.clearTimeout(timeout);
+  }, []);
 
   const startCamera = async () => {
     const media = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
     setStream(media);
     if (videoRef.current) videoRef.current.srcObject = media;
+    startLivePrechecks();
+  };
+
+  const startSpeechCheck = () => {
+    const Recognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!Recognition) return;
+    const recognition = new Recognition();
+    recognition.lang = 'en-US';
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.onresult = (event: any) => {
+      const text = Array.from(event.results || []).map((result: any) => result?.[0]?.transcript || '').join(' ').trim();
+      setTranscript(text);
+      const normalizedText = text.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ');
+      const normalizedChallenge = challenge.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ');
+      if (normalizedText.includes(normalizedChallenge.slice(0, Math.max(16, normalizedChallenge.length - 8)))) setPhraseHeard(true);
+    };
+    recognition.onerror = () => {};
+    recognitionRef.current = recognition;
+    recognition.start();
+  };
+
+  const startLivePrechecks = () => {
+    if (precheckTimerRef.current) window.clearInterval(precheckTimerRef.current);
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d');
+    const FaceDetectorClass = (window as any).FaceDetector;
+    const detector = FaceDetectorClass ? new FaceDetectorClass({ fastMode: true, maxDetectedFaces: 1 }) : null;
+
+    precheckTimerRef.current = window.setInterval(async () => {
+      const video = videoRef.current;
+      if (!video || !context || video.readyState < 2) return;
+      canvas.width = 160;
+      canvas.height = 90;
+      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const frame = context.getImageData(0, 0, canvas.width, canvas.height);
+      if (previousFrameRef.current) {
+        let diff = 0;
+        for (let i = 0; i < frame.data.length; i += 16) diff += Math.abs(frame.data[i] - previousFrameRef.current.data[i]);
+        if (diff / (frame.data.length / 16) > 8) setMotionDetected(true);
+      }
+      previousFrameRef.current = frame;
+      if (detector) {
+        try {
+          const faces = await detector.detect(video);
+          if (faces?.length) setFaceDetected(true);
+        } catch {
+          if (video.videoWidth > 0) setFaceDetected(true);
+        }
+      } else if (video.videoWidth > 0) {
+        setFaceDetected(true);
+      }
+    }, 700);
   };
 
   const startRecording = async () => {
@@ -49,12 +118,22 @@ export default function VerifyPage() {
     };
     mediaRecorder.start();
     setRecorder(mediaRecorder);
+    setPhraseHeard(false);
+    setTranscript('');
+    startSpeechCheck();
   };
 
   const stopRecording = () => {
     recorder?.stop();
+    recognitionRef.current?.stop?.();
     setRecorder(null);
   };
+
+  useEffect(() => () => {
+    recognitionRef.current?.stop?.();
+    if (precheckTimerRef.current) window.clearInterval(precheckTimerRef.current);
+    stream?.getTracks().forEach((track) => track.stop());
+  }, [stream]);
 
   const uploadBlob = async (blob: Blob, filename: string, resourceType: 'image' | 'video' | 'raw') => {
     const dataUrl = await new Promise<string>((resolve, reject) => {
@@ -116,7 +195,7 @@ export default function VerifyPage() {
   };
 
   return (
-    <div className="flex-1 overflow-y-auto bg-background p-6">
+    <div className="flex-1 overflow-y-auto bg-background p-6 pb-18">
       <div className="mx-auto max-w-4xl space-y-8">
         <header className="space-y-3">
           <div className="inline-flex items-center gap-2 rounded-full border border-accent/20 bg-accent/10 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-accent">
@@ -154,6 +233,18 @@ export default function VerifyPage() {
               </button>
             )}
           </div>
+          <div className="mt-5 grid gap-2 sm:grid-cols-3">
+            {[
+              ['Face visible', faceDetected],
+              ['Movement detected', motionDetected],
+              ['Phrase heard', phraseHeard],
+            ].map(([label, done]) => (
+              <div key={String(label)} className={`rounded-2xl border px-4 py-3 text-xs font-black uppercase tracking-widest ${done ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400' : 'border-border bg-background text-foreground/40'}`}>
+                {String(label)}
+              </div>
+            ))}
+          </div>
+          {transcript && <div className="mt-3 rounded-2xl border border-border bg-background p-3 text-xs text-foreground/60">Heard: {transcript}</div>}
         </section>
 
         <section className="rounded-[2rem] border border-border bg-muted/30 p-6">
@@ -161,7 +252,7 @@ export default function VerifyPage() {
           <p className="mb-5 text-sm leading-7 text-foreground/60">
             Use the live video first. Attach your student ID only if it was not clearly visible. Documents are used only for verification review and should be deleted after review is completed.
           </p>
-          <input ref={idRef} type="file" accept="image/*,.pdf" onChange={handleIdChange} className="hidden" />
+          <input title="Upload student ID" ref={idRef} type="file" accept="image/*,.pdf" onChange={handleIdChange} className="hidden" />
           <button onClick={() => idRef.current?.click()} className="inline-flex items-center gap-2 rounded-xl border border-border bg-background px-5 py-3 text-xs font-black uppercase tracking-widest">
             <Upload size={16} /> Attach ID
           </button>

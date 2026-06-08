@@ -15,8 +15,17 @@ export async function POST(request: Request) {
     const buffer = Buffer.from(base64, 'base64');
     const sizeBytes = buffer.length;
 
-    // Determine resource type (image or raw). If provided, trust but validate.
-    const rType = resourceType === 'raw' ? 'raw' : resourceType === 'image' ? 'image' : (mime.startsWith('image/') ? 'image' : 'raw');
+    const rType = resourceType === 'video'
+      ? 'video'
+      : resourceType === 'raw'
+        ? 'raw'
+        : resourceType === 'image'
+          ? 'image'
+          : mime.startsWith('image/')
+            ? 'image'
+            : mime.startsWith('video/')
+              ? 'video'
+              : 'raw';
 
     const allowedImageMimes = new Set([
       'image/jpeg',
@@ -36,9 +45,16 @@ export async function POST(request: Request) {
       'application/vnd.ms-excel',
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     ]);
+    const allowedVideoMimes = new Set([
+      'video/webm',
+      'video/mp4',
+      'video/quicktime',
+      'video/mpeg',
+    ]);
 
     const imageMax = Number(process.env.UPLOAD_MAX_IMAGE_BYTES) || 5 * 1024 * 1024; // 5MB
     const rawMax = Number(process.env.UPLOAD_MAX_RAW_BYTES) || 10 * 1024 * 1024; // 10MB
+    const videoMax = Number(process.env.UPLOAD_MAX_VIDEO_BYTES) || 10 * 1024 * 1024; // 10MB
 
     if (rType === 'image') {
       if (!allowedImageMimes.has(mime)) {
@@ -46,6 +62,13 @@ export async function POST(request: Request) {
       }
       if (sizeBytes > imageMax) {
         return NextResponse.json({ error: `Image too large: ${Math.round(sizeBytes/1024)}KB` }, { status: 413 });
+      }
+    } else if (rType === 'video') {
+      if (!allowedVideoMimes.has(mime)) {
+        return NextResponse.json({ error: `Unsupported video type: ${mime}` }, { status: 400 });
+      }
+      if (sizeBytes > videoMax) {
+        return NextResponse.json({ error: `Video too large: ${Math.round(sizeBytes/1024)}KB` }, { status: 413 });
       }
     } else {
       // raw
