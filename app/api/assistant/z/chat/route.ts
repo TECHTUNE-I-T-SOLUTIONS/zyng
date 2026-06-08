@@ -8,9 +8,20 @@ const MODELS = ['gemini-2.5-flash-lite', 'gemini-2.5-flash', 'gemini-3.1-flash-l
 const LIVE_MODELS = ['gemini-2.5-flash-lite'];
 
 const ROUTES = [
+  { label: 'Home', path: '/', keywords: ['home', 'landing'] },
+  { label: 'About', path: '/about', keywords: ['about', 'mission'] },
+  { label: 'Features', path: '/features', keywords: ['features', 'what can zyng do'] },
+  { label: 'FAQ', path: '/faq', keywords: ['faq', 'questions'] },
+  { label: 'Contact', path: '/contact', keywords: ['contact', 'support'] },
+  { label: 'Signup', path: '/in/signup', keywords: ['signup', 'sign up', 'register', 'create account'] },
+  { label: 'Login', path: '/in/login', keywords: ['login', 'log in', 'signin', 'sign in'] },
   { label: 'Feed', path: '/z-feed', keywords: ['feed', 'campus feed', 'posts', 'zyngs'] },
+  { label: 'Create', path: '/z-create', keywords: ['create', 'create post', 'new post', 'post', 'zyng', 'confession', 'poll', 'hot take', 'missed'] },
+  { label: 'Search', path: '/z-search', keywords: ['search', 'find'] },
   { label: 'Pro Hub', path: '/z-pro', keywords: ['pro hub', 'pro', 'professional hub'] },
   { label: 'Portfolio Builder', path: '/z-pro/portfolio', keywords: ['portfolio', 'resume', 'cv', 'builder'] },
+  { label: 'Applications', path: '/z-pro/applications', keywords: ['applications', 'my applications'] },
+  { label: 'Create Job', path: '/z-pro/create-job', keywords: ['create job', 'post job'] },
   { label: 'Rooms', path: '/z-rooms', keywords: ['rooms', 'room', 'communities', 'chat rooms'] },
   { label: 'Events', path: '/z-events', keywords: ['events', 'event'] },
   { label: 'Marketplace', path: '/z-marketplace', keywords: ['marketplace', 'market', 'products', 'product', 'buy', 'sell'] },
@@ -22,6 +33,17 @@ const ROUTES = [
   { label: 'Personas', path: '/z-personas', keywords: ['personas', 'persona'] },
   { label: 'Referrals', path: '/z-referral', keywords: ['referrals', 'referral', 'invite', 'invites'] },
   { label: 'Verification', path: '/z-verify', keywords: ['verify', 'verification', 'verified'] },
+  { label: 'Reports', path: '/z-reports', keywords: ['reports', 'moderation reports'] },
+  { label: 'Alumni Dashboard', path: '/z-alumni/dashboard', keywords: ['alumni dashboard', 'alumni home'] },
+  { label: 'Alumni Feed', path: '/z-alumni/feed', keywords: ['alumni feed'] },
+  { label: 'Alumni Create', path: '/z-alumni/create', keywords: ['alumni create', 'alumni post'] },
+  { label: 'Alumni Connect', path: '/z-alumni/connect', keywords: ['alumni connect', 'connect alumni'] },
+  { label: 'Alumni Messages', path: '/z-alumni/messages', keywords: ['alumni messages'] },
+  { label: 'Alumni Jobs', path: '/z-alumni/jobs', keywords: ['alumni jobs'] },
+  { label: 'Alumni Events', path: '/z-alumni/events', keywords: ['alumni events'] },
+  { label: 'Alumni Marketplace', path: '/z-alumni/marketplace', keywords: ['alumni marketplace'] },
+  { label: 'Alumni Portfolio', path: '/z-alumni/portfolio', keywords: ['alumni portfolio'] },
+  { label: 'Alumni Profile', path: '/z-alumni/profile', keywords: ['alumni profile'] },
 ];
 
 const findRoute = (text: string) => {

@@ -7,8 +7,21 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 const APP_SURFACES = [
+  { name: 'Home', path: '/', purpose: 'Public landing page for Zyng.' },
+  { name: 'About', path: '/about', purpose: 'Public explanation of Zyng and its mission.' },
+  { name: 'Features', path: '/features', purpose: 'Overview of Zyng product features.' },
+  { name: 'FAQ', path: '/faq', purpose: 'Frequently asked questions about Zyng.' },
+  { name: 'Contact', path: '/contact', purpose: 'Public contact and support entry point.' },
+  { name: 'Feedback', path: '/feedback', purpose: 'Collect product feedback.' },
+  { name: 'Login', path: '/in/login', purpose: 'Sign in to Zyng.' },
+  { name: 'Signup', path: '/in/signup', purpose: 'Create a Zyng account with school, faculty, department, graduation month, and recovery details.' },
+  { name: 'Recover Account', path: '/in/recover', purpose: 'Recover a Zyng account.' },
   { name: 'Feed', path: '/z-feed', purpose: 'Campus posts, replies, reactions, and social discovery.' },
+  { name: 'Create', path: '/z-create', purpose: 'Create Zyng posts, confessions, polls, hot takes, and missed connections.' },
+  { name: 'Search', path: '/z-search', purpose: 'Search across Zyng content and people.' },
   { name: 'Pro Hub', path: '/z-pro', purpose: 'Professional tools, portfolio, applications, jobs, and resume workflows.' },
+  { name: 'Create Job', path: '/z-pro/create-job', purpose: 'Create professional opportunities and job posts.' },
+  { name: 'Applications', path: '/z-pro/applications', purpose: 'Manage opportunity applications.' },
   { name: 'Rooms', path: '/z-rooms', purpose: 'Focused campus rooms and conversations.' },
   { name: 'Events', path: '/z-events', purpose: 'Campus events and activities.' },
   { name: 'Marketplace', path: '/z-marketplace', purpose: 'Student listings, buying, selling, and sharing items.' },
@@ -18,6 +31,17 @@ const APP_SURFACES = [
   { name: 'Notifications', path: '/z-notifications', purpose: 'Personal alerts and activity updates.' },
   { name: 'Personas', path: '/z-personas', purpose: 'Create and activate public identities used around Zyng.' },
   { name: 'Profile', path: '/z-profile', purpose: 'Account, school context, skills, hobbies, and persona management.' },
+  { name: 'Reports', path: '/z-reports', purpose: 'Track user-submitted reports and moderation outcomes.' },
+  { name: 'Alumni Dashboard', path: '/z-alumni/dashboard', purpose: 'Alumni home and professional/social overview.' },
+  { name: 'Alumni Feed', path: '/z-alumni/feed', purpose: 'Alumni social and professional posts.' },
+  { name: 'Alumni Create', path: '/z-alumni/create', purpose: 'Create alumni posts, trends, polls, pulses, and opportunities.' },
+  { name: 'Alumni Connect', path: '/z-alumni/connect', purpose: 'Discover and connect with alumni.' },
+  { name: 'Alumni Messages', path: '/z-alumni/messages', purpose: 'Alumni direct messages.' },
+  { name: 'Alumni Jobs', path: '/z-alumni/jobs', purpose: 'Alumni jobs and opportunities.' },
+  { name: 'Alumni Events', path: '/z-alumni/events', purpose: 'Alumni events.' },
+  { name: 'Alumni Marketplace', path: '/z-alumni/marketplace', purpose: 'Alumni marketplace.' },
+  { name: 'Alumni Portfolio', path: '/z-alumni/portfolio', purpose: 'Alumni portfolio tools.' },
+  { name: 'Alumni Profile', path: '/z-alumni/profile', purpose: 'Alumni profile and account details.' },
 ];
 
 const loadWebsiteKnowledge = async () => {

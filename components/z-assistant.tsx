@@ -4,7 +4,7 @@ import { PointerEvent as ReactPointerEvent, useEffect, useMemo, useRef, useState
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { AnimatePresence, motion } from 'motion/react';
-import { Loader2, Mic, Phone, PhoneOff, Send, Volume2, VolumeX, X } from 'lucide-react';
+import { Loader2, Mic, Phone, PhoneOff, Send, Square, Volume2, VolumeX, X } from 'lucide-react';
 
 type ZAssistantProps = {
   user?: any;
@@ -23,6 +23,15 @@ type Position = {
 type NavigationTarget = {
   label: string;
   path: string;
+};
+
+type PostType = 'regular' | 'confession' | 'poll' | 'hot_take' | 'missed_connection';
+
+type PostDraft = {
+  type: PostType;
+  content: string;
+  hashtag: string;
+  pollOptions: string[];
 };
 
 type SpeechRecognitionConstructor = new () => SpeechRecognition;
@@ -45,11 +54,13 @@ declare global {
   }
 }
 
+const Z_CREATE_DRAFT_EVENT = 'z:create-draft';
+
 const getDefaultPosition = (): Position => {
   if (typeof window === 'undefined') return { x: 16, y: 220 };
   return {
-    x: Math.max(8, window.innerWidth - 86),
-    y: Math.max(96, Math.round(window.innerHeight / 2) - 28),
+    x: Math.max(12, window.innerWidth - 78),
+    y: Math.max(88, window.innerHeight - 132),
   };
 };
 
@@ -64,9 +75,20 @@ const buildProactiveLine = (context: any) => {
 };
 
 const ROUTES: Array<NavigationTarget & { keywords: string[] }> = [
+  { label: 'Home', path: '/', keywords: ['home', 'landing'] },
+  { label: 'About', path: '/about', keywords: ['about', 'mission'] },
+  { label: 'Features', path: '/features', keywords: ['features', 'what can zyng do'] },
+  { label: 'FAQ', path: '/faq', keywords: ['faq', 'questions'] },
+  { label: 'Contact', path: '/contact', keywords: ['contact', 'support'] },
+  { label: 'Signup', path: '/in/signup', keywords: ['signup', 'sign up', 'register', 'create account'] },
+  { label: 'Login', path: '/in/login', keywords: ['login', 'log in', 'signin', 'sign in'] },
   { label: 'Feed', path: '/z-feed', keywords: ['feed', 'campus feed', 'posts', 'zyngs'] },
+  { label: 'Create', path: '/z-create', keywords: ['create', 'create post', 'new post', 'post', 'zyng', 'confession', 'poll', 'hot take', 'missed'] },
+  { label: 'Search', path: '/z-search', keywords: ['search', 'find'] },
   { label: 'Pro Hub', path: '/z-pro', keywords: ['pro hub', 'pro', 'professional hub'] },
   { label: 'Portfolio Builder', path: '/z-pro/portfolio', keywords: ['portfolio', 'resume', 'cv', 'builder'] },
+  { label: 'Applications', path: '/z-pro/applications', keywords: ['applications', 'my applications'] },
+  { label: 'Create Job', path: '/z-pro/create-job', keywords: ['create job', 'post job'] },
   { label: 'Rooms', path: '/z-rooms', keywords: ['rooms', 'room', 'communities', 'chat rooms'] },
   { label: 'Events', path: '/z-events', keywords: ['events', 'event'] },
   { label: 'Marketplace', path: '/z-marketplace', keywords: ['marketplace', 'market', 'products', 'product', 'buy', 'sell'] },
@@ -78,6 +100,17 @@ const ROUTES: Array<NavigationTarget & { keywords: string[] }> = [
   { label: 'Personas', path: '/z-personas', keywords: ['personas', 'persona'] },
   { label: 'Referrals', path: '/z-referral', keywords: ['referrals', 'referral', 'invite', 'invites'] },
   { label: 'Verification', path: '/z-verify', keywords: ['verify', 'verification', 'verified'] },
+  { label: 'Reports', path: '/z-reports', keywords: ['reports', 'moderation reports'] },
+  { label: 'Alumni Dashboard', path: '/z-alumni/dashboard', keywords: ['alumni dashboard', 'alumni home'] },
+  { label: 'Alumni Feed', path: '/z-alumni/feed', keywords: ['alumni feed'] },
+  { label: 'Alumni Create', path: '/z-alumni/create', keywords: ['alumni create', 'alumni post'] },
+  { label: 'Alumni Connect', path: '/z-alumni/connect', keywords: ['alumni connect', 'connect alumni'] },
+  { label: 'Alumni Messages', path: '/z-alumni/messages', keywords: ['alumni messages'] },
+  { label: 'Alumni Jobs', path: '/z-alumni/jobs', keywords: ['alumni jobs'] },
+  { label: 'Alumni Events', path: '/z-alumni/events', keywords: ['alumni events'] },
+  { label: 'Alumni Marketplace', path: '/z-alumni/marketplace', keywords: ['alumni marketplace'] },
+  { label: 'Alumni Portfolio', path: '/z-alumni/portfolio', keywords: ['alumni portfolio'] },
+  { label: 'Alumni Profile', path: '/z-alumni/profile', keywords: ['alumni profile'] },
 ];
 
 const findRoute = (text: string) => {
@@ -88,6 +121,31 @@ const findRoute = (text: string) => {
 const isAffirmative = (text: string) => /^(yes|yeah|yep|sure|ok|okay|please|take me|go|open it|do it|let's go|lets go)\b/i.test(text.trim());
 
 const isDirectNavigationRequest = (text: string) => /\b(take me|go to|open|navigate|show me|bring me)\b/i.test(text);
+
+const postTypeFromText = (text: string): PostType => {
+  const normalized = text.toLowerCase();
+  if (/\bpoll|vote|options?\b/.test(normalized)) return 'poll';
+  if (/\bconfess|confession|anonymous|secret\b/.test(normalized)) return 'confession';
+  if (/\bhot\s*take|spicy|controversial|unpopular opinion|authentic type\b/.test(normalized)) return 'hot_take';
+  if (/\bmissed|connection|saw someone|looking for someone\b/.test(normalized)) return 'missed_connection';
+  return 'regular';
+};
+
+const isCreatePostRequest = (text: string) => /\b(create|write|draft|make|post)\b.*\b(post|zyng|confession|poll|hot take|missed)\b/i.test(text)
+  || /\b(i wanna|i want to|help me)\b.*\b(create|write|draft|make|put it|fill)\b/i.test(text)
+  || /\bput it\b.*\b(field|create|post)\b/i.test(text);
+
+const buildCreatePath = (text: string, draftId?: string) => {
+  const params = new URLSearchParams();
+  params.set('zDraft', draftId || '1');
+  params.set('type', postTypeFromText(text));
+  params.set('prompt', text);
+  return `/z-create?${params.toString()}`;
+};
+
+const dispatchCreateDraft = (draft: PostDraft) => {
+  window.dispatchEvent(new CustomEvent(Z_CREATE_DRAFT_EVENT, { detail: draft }));
+};
 
 const renderMarkdown = (content: string) => {
   const lines = content.split('\n').filter((line) => line.trim());
@@ -148,6 +206,7 @@ export function ZAssistant({ user }: ZAssistantProps) {
   const liveVoiceRef = useRef(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const awaitingLiveReplyRef = useRef(false);
+  const draftCounterRef = useRef(0);
 
   const isInteractiveTarget = (target: EventTarget | null) => (
     target instanceof HTMLElement
@@ -165,6 +224,8 @@ export function ZAssistant({ user }: ZAssistantProps) {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ userId: user.id }),
         });
+        const contentType = response.headers.get('content-type') || '';
+        if (!contentType.includes('application/json')) throw new Error(`Expected JSON, got ${response.status}`);
         const json = await response.json();
         if (!mounted || !response.ok) return;
         setContext(json);
@@ -194,7 +255,12 @@ export function ZAssistant({ user }: ZAssistantProps) {
     if (!user?.id) return;
     try {
       const stored = window.localStorage.getItem(`z-assistant-position:${user.id}`);
-      if (!stored) return;
+      if (!stored || window.innerWidth < 1024) {
+        const next = getDefaultPosition();
+        positionRef.current = next;
+        window.requestAnimationFrame(() => setPosition(next));
+        return;
+      }
       const parsed = JSON.parse(stored);
       if (typeof parsed?.x === 'number' && typeof parsed?.y === 'number') {
         const next = {
@@ -208,6 +274,24 @@ export function ZAssistant({ user }: ZAssistantProps) {
       // Ignore invalid local placement data.
     }
   }, [user?.id]);
+
+  useEffect(() => {
+    const clampToViewport = () => {
+      const next = {
+        x: Math.max(12, Math.min(positionRef.current.x, window.innerWidth - 72)),
+        y: Math.max(88, Math.min(positionRef.current.y, window.innerHeight - 112)),
+      };
+      positionRef.current = next;
+      setPosition(next);
+    };
+    window.addEventListener('resize', clampToViewport);
+    window.addEventListener('orientationchange', clampToViewport);
+    clampToViewport();
+    return () => {
+      window.removeEventListener('resize', clampToViewport);
+      window.removeEventListener('orientationchange', clampToViewport);
+    };
+  }, []);
 
   const proactiveLine = useMemo(() => buildProactiveLine(context), [context]);
 
@@ -231,7 +315,7 @@ export function ZAssistant({ user }: ZAssistantProps) {
     if (!dragging) return;
     const next = {
       x: Math.max(8, Math.min(event.clientX - dragOffsetRef.current.x, window.innerWidth - 72)),
-      y: Math.max(80, Math.min(event.clientY - dragOffsetRef.current.y, window.innerHeight - 96)),
+      y: Math.max(88, Math.min(event.clientY - dragOffsetRef.current.y, window.innerHeight - 112)),
     };
     if (Math.abs(next.x - position.x) > 2 || Math.abs(next.y - position.y) > 2) {
       dragMovedRef.current = true;
@@ -255,6 +339,24 @@ export function ZAssistant({ user }: ZAssistantProps) {
     window.setTimeout(() => setVoiceStatus(''), 1200);
   };
 
+  const draftPost = async (text: string): Promise<PostDraft | null> => {
+    try {
+      const response = await fetch('/api/assistant/z/draft-post', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: text, requestedType: postTypeFromText(text), context }),
+      });
+      const contentType = response.headers.get('content-type') || '';
+      if (!contentType.includes('application/json')) throw new Error(`Expected JSON, got ${response.status}`);
+      const json = await response.json();
+      if (!response.ok || !json.draft) throw new Error(json.error || 'Draft failed');
+      return json.draft;
+    } catch (error) {
+      console.error('Z draft failed', error);
+      return null;
+    }
+  };
+
   const send = async (message = input, options?: { speakReply?: boolean; inputType?: 'text' | 'speech'; keepClosed?: boolean; fastVoice?: boolean }) => {
     const clean = message.trim();
     if (!clean || loading) return;
@@ -267,6 +369,28 @@ export function ZAssistant({ user }: ZAssistantProps) {
       setMessages(nextMessages);
       setInput('');
       navigateTo(pendingNavigation);
+      return;
+    }
+    if (isCreatePostRequest(clean)) {
+      setLoading(true);
+      setMessages([
+        ...messages,
+        { role: 'user', content: clean },
+        { role: 'assistant', content: 'Opening **Create** and filling the draft for you.' },
+      ]);
+      setInput('');
+      const draft = await draftPost(clean);
+      draftCounterRef.current += 1;
+      const draftId = `z-draft-${user.id}-${draftCounterRef.current}`;
+      if (draft) {
+        window.sessionStorage.setItem(draftId, JSON.stringify(draft));
+      }
+      setLoading(false);
+      navigateTo({ label: 'Create', path: buildCreatePath(clean, draft ? draftId : undefined) });
+      if (draft) {
+        window.setTimeout(() => dispatchCreateDraft(draft), 250);
+        window.setTimeout(() => dispatchCreateDraft(draft), 900);
+      }
       return;
     }
     const directTarget = findRoute(clean);
@@ -293,10 +417,11 @@ export function ZAssistant({ user }: ZAssistantProps) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: clean, context, history: nextMessages, inputType: options?.inputType || 'text', callActive }),
       });
+      const contentType = response.headers.get('content-type') || '';
+      if (!contentType.includes('application/json')) throw new Error(`Expected JSON, got ${response.status}`);
       const json = await response.json();
       const reply = response.ok ? json.reply : (json.error || 'Z is unavailable right now.');
       setMessages([...nextMessages, { role: 'assistant', content: reply }]);
-      if (json.suggestedRoute?.path) setPendingNavigation({ label: json.suggestedRoute.label, path: json.suggestedRoute.path });
       if ((options?.speakReply ?? voiceEnabled) && reply) void speak(reply, { fast: options?.fastVoice });
     } catch (error) {
       console.error('Z send failed', error);
@@ -318,6 +443,8 @@ export function ZAssistant({ user }: ZAssistantProps) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text: clean, lowLatency: Boolean(options?.fast) }),
       });
+      const contentType = response.headers.get('content-type') || '';
+      if (!contentType.includes('application/json')) throw new Error(`Expected JSON, got ${response.status}`);
       const json = await response.json();
       if (!response.ok || !json.audio) throw new Error(json.error || 'TTS failed');
       window.speechSynthesis?.cancel();
@@ -332,8 +459,14 @@ export function ZAssistant({ user }: ZAssistantProps) {
       await audio.play();
     } catch (error) {
       console.warn('Gemini voice failed', error);
-      setVoiceStatus('Google voice is unavailable right now.');
-      if (liveVoiceRef.current) window.setTimeout(() => startListening(true), 500);
+      const utterance = new SpeechSynthesisUtterance(clean.slice(0, options?.fast ? 280 : 900));
+      utterance.rate = options?.fast ? 1.12 : 1;
+      utterance.onend = () => {
+        setVoiceStatus('');
+        if (liveVoiceRef.current) window.setTimeout(() => startListening(true), 180);
+      };
+      setVoiceStatus('Z is speaking...');
+      window.speechSynthesis?.speak(utterance);
     }
   };
 
@@ -348,7 +481,7 @@ export function ZAssistant({ user }: ZAssistantProps) {
     const recognition = new SpeechRecognitionClass();
     recognitionRef.current = recognition;
     recognition.continuous = false;
-    recognition.interimResults = false;
+    recognition.interimResults = true;
     recognition.lang = 'en-US';
     recognition.onresult = (event: any) => {
       const transcript = Array.from(event.results || [])
@@ -356,11 +489,14 @@ export function ZAssistant({ user }: ZAssistantProps) {
         .join(' ')
         .trim();
       if (!transcript) return;
+      setInput(transcript);
+      const lastResult = event.results?.[event.results.length - 1];
+      if (!lastResult?.isFinal) return;
       if (live) {
+        setInput('');
         void send(transcript, { speakReply: true, inputType: 'speech', keepClosed: true, fastVoice: true });
         return;
       }
-      setInput((value) => `${value ? `${value.trim()} ` : ''}${transcript}`.trim());
       setVoiceStatus('Recording captured. Review it, then send.');
     };
     recognition.onend = () => {
@@ -505,18 +641,31 @@ export function ZAssistant({ user }: ZAssistantProps) {
                   {message.role === 'assistant' ? renderMarkdown(message.content) : message.content}
                 </div>
               ))}
-              {pendingNavigation && (
-                <button
-                  type="button"
-                  onClick={() => navigateTo(pendingNavigation)}
-                  className="mr-auto rounded-2xl border border-accent/30 bg-accent/10 px-3 py-2 text-left text-xs font-black uppercase tracking-wider text-accent"
-                >
-                  Take me to {pendingNavigation.label}
-                </button>
-              )}
               {loading && <div className="inline-flex items-center gap-2 rounded-2xl bg-muted px-3 py-2 text-xs text-foreground/50"><Loader2 size={14} className="animate-spin" /> Z is thinking</div>}
               {voiceStatus && <div className="inline-flex items-center gap-2 rounded-2xl border border-accent/20 bg-accent/10 px-3 py-2 text-xs font-semibold text-accent">{listening && <Mic size={14} className="animate-pulse" />}{voiceStatus}</div>}
             </div>
+
+            {(listening || callActive) && (
+              <div className="border-t border-border bg-accent/5 px-4 py-3">
+                <div className="mb-2 flex items-center justify-between text-xs font-black uppercase tracking-widest text-accent">
+                  <span>{callActive ? 'Live call' : 'Recording'}</span>
+                  <span className="flex items-center gap-1"><span className="h-2 w-2 animate-pulse rounded-full bg-red-500" /> On</span>
+                </div>
+                <div className="min-h-10 rounded-2xl border border-accent/20 bg-background px-3 py-2 text-sm text-foreground/70">
+                  {input || 'Listening...'}
+                </div>
+                {!callActive && (
+                  <div className="mt-3 flex gap-2">
+                    <button type="button" onClick={stopLiveVoice} className="flex flex-1 items-center justify-center gap-2 rounded-2xl border border-border bg-muted py-2 text-xs font-black uppercase tracking-widest">
+                      <Square size={14} /> Stop
+                    </button>
+                    <button type="button" onClick={() => void send()} disabled={!input.trim()} className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-accent py-2 text-xs font-black uppercase tracking-widest text-black disabled:opacity-40">
+                      <Send size={14} /> Send
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
 
             <form
               className="flex items-center gap-2 border-t border-border p-3"

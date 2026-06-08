@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { X, Image as ImageIcon, MessageSquare, Zap, BarChart2, Flame, MapPin, PlusSquare, ChevronLeft, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -9,17 +10,41 @@ import Link from 'next/link';
 import { userService } from '@/lib/services/userService';
 import { postService } from '@/lib/services/postService';
 // personas are included on the user object when available from the server fallback
-import { useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useToast } from '@/components/toast';
 import { ACTIVE_PERSONA_ALERT, getActivePersona } from '@/lib/persona-utils';
 
 type PostType = 'regular' | 'confession' | 'poll' | 'hot_take' | 'missed_connection';
 
+const Z_CREATE_DRAFT_EVENT = 'z:create-draft';
+
 export default function ZCreate() {
   const router = useRouter();
-  const [activeType, setActiveType] = useState<PostType>('regular');
-  const [content, setContent] = useState('');
-  const [hashtag, setHashtag] = useState('');
+  const searchParams = useSearchParams();
+  const assistantDraft = useMemo(() => {
+    const draftKey = searchParams?.get('zDraft');
+    if (!draftKey) return null;
+    if (typeof window !== 'undefined' && draftKey !== '1') {
+      try {
+        const stored = window.sessionStorage.getItem(draftKey);
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          window.sessionStorage.removeItem(draftKey);
+          return normalizeAssistantDraft(parsed, searchParams.get('prompt') || '');
+        }
+      } catch {
+        // Fall back to prompt-based drafting below.
+      }
+    }
+    const prompt = searchParams.get('prompt') || '';
+    const requestedType = searchParams.get('type') as PostType | null;
+    const allowedTypes: PostType[] = ['regular', 'confession', 'poll', 'hot_take', 'missed_connection'];
+    const type = requestedType && allowedTypes.includes(requestedType) ? requestedType : inferPostType(prompt);
+    return { type, ...buildAssistantDraft(prompt, type) };
+  }, [searchParams]);
+  const [activeType, setActiveType] = useState<PostType>(assistantDraft?.type || 'regular');
+  const [content, setContent] = useState(assistantDraft?.content || '');
+  const [hashtag, setHashtag] = useState(assistantDraft?.hashtag || '');
   const [mediaUrl, setMediaUrl] = useState<string | null>(null);
   const [selectedImages, setSelectedImages] = useState<{
     id: string;
@@ -31,8 +56,9 @@ export default function ZCreate() {
   }[]>([]);
   const [uploading, setUploading] = useState(false);
   const [showPollModal, setShowPollModal] = useState(false);
-  const [pollOptions, setPollOptions] = useState<string[]>(['', '']);
+  const [pollOptions, setPollOptions] = useState<string[]>(assistantDraft?.type === 'poll' ? assistantDraft.pollOptions : ['', '']);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const appliedDraftRef = useRef<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const { data: user, isLoading: userLoading } = useQuery({ queryKey: ['me'], queryFn: () => userService.getCurrentUser() });
@@ -48,6 +74,53 @@ export default function ZCreate() {
   ];
 
   const { show } = useToast();
+
+  const applyAssistantDraft = useCallback((draft: { type: PostType; content: string; hashtag: string; pollOptions: string[] }) => {
+    setActiveType(draft.type);
+    setContent(draft.content);
+    setHashtag(draft.hashtag);
+    setPollOptions(draft.type === 'poll' ? draft.pollOptions : ['', '']);
+  }, []);
+
+  useEffect(() => {
+    const handleAssistantDraft = (event: Event) => {
+      const draft = normalizeAssistantDraft((event as CustomEvent).detail, '');
+      applyAssistantDraft(draft);
+      window.history.replaceState(null, '', '/z-create');
+    };
+    window.addEventListener(Z_CREATE_DRAFT_EVENT, handleAssistantDraft);
+    return () => window.removeEventListener(Z_CREATE_DRAFT_EVENT, handleAssistantDraft);
+  }, [applyAssistantDraft]);
+
+  useEffect(() => {
+    const draftKey = searchParams?.get('zDraft');
+    if (!draftKey || appliedDraftRef.current === draftKey) return;
+    appliedDraftRef.current = draftKey;
+    const timeout = window.setTimeout(() => {
+      const prompt = searchParams.get('prompt') || '';
+      let nextDraft = null;
+      if (draftKey !== '1') {
+        try {
+          const stored = window.sessionStorage.getItem(draftKey);
+          if (stored) {
+            nextDraft = normalizeAssistantDraft(JSON.parse(stored), prompt);
+            window.sessionStorage.removeItem(draftKey);
+          }
+        } catch {
+          nextDraft = null;
+        }
+      }
+      if (!nextDraft) {
+        const requestedType = searchParams.get('type') as PostType | null;
+        const allowedTypes: PostType[] = ['regular', 'confession', 'poll', 'hot_take', 'missed_connection'];
+        const type = requestedType && allowedTypes.includes(requestedType) ? requestedType : inferPostType(prompt);
+        nextDraft = { type, ...buildAssistantDraft(prompt, type) };
+      }
+      applyAssistantDraft(nextDraft);
+      window.history.replaceState(null, '', '/z-create');
+    }, 0);
+    return () => window.clearTimeout(timeout);
+  }, [applyAssistantDraft, searchParams]);
 
   const handleSubmit = async () => {
     // validate early and show feedback if missing
@@ -422,4 +495,71 @@ export default function ZCreate() {
       )}
     </div>
   );
+}
+
+function inferPostType(prompt: string): PostType {
+  const normalized = prompt.toLowerCase();
+  if (/\bpoll|vote|options?\b/.test(normalized)) return 'poll';
+  if (/\bconfess|confession|anonymous|secret\b/.test(normalized)) return 'confession';
+  if (/\bhot\s*take|spicy|controversial|unpopular opinion|authentic type\b/.test(normalized)) return 'hot_take';
+  if (/\bmissed|connection|saw someone|looking for someone\b/.test(normalized)) return 'missed_connection';
+  return 'regular';
+}
+
+function normalizeAssistantDraft(draft: any, prompt: string) {
+  const allowedTypes: PostType[] = ['regular', 'confession', 'poll', 'hot_take', 'missed_connection'];
+  const type = allowedTypes.includes(draft?.type) ? draft.type as PostType : inferPostType(String(draft?.type || prompt));
+  const content = String(draft?.content || cleanDraftContent(prompt, type)).slice(0, 500);
+  const hashtag = String(draft?.hashtag || buildHashtags(`${prompt} ${content}`, type)).slice(0, 120);
+  const pollOptions = type === 'poll'
+    ? (Array.isArray(draft?.pollOptions) ? draft.pollOptions.map(String).filter(Boolean).slice(0, 4) : ['Yes', 'No'])
+    : ['', ''];
+
+  return { type, content, hashtag, pollOptions };
+}
+
+function cleanDraftContent(prompt: string, type: PostType) {
+  const cleaned = prompt
+    .replace(/\b(i wanna|i want to|help me|can you|please)\b/gi, '')
+    .replace(/\b(create|write|draft|make|post)\b/gi, '')
+    .replace(/\b(a|an|the)?\s*(zyng|post|confession|poll|hot take|missed connection|missed)\b/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (cleaned) return cleaned;
+  if (type === 'poll') return 'What should the campus vote on today?';
+  if (type === 'confession') return 'I have something I need to get off my chest...';
+  if (type === 'hot_take') return 'Hot take: ';
+  if (type === 'missed_connection') return 'I am looking for someone I crossed paths with...';
+  return 'What is happening on campus?';
+}
+
+function buildHashtags(text: string, type: PostType) {
+  const baseByType: Record<PostType, string[]> = {
+    regular: ['#zyng', '#campus'],
+    confession: ['#confession', '#campus'],
+    poll: ['#poll', '#campus'],
+    hot_take: ['#hottake', '#campus'],
+    missed_connection: ['#missed', '#campus'],
+  };
+  const words = text
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .split(/\s+/)
+    .filter((word) => word.length > 3 && !['want', 'wanna', 'create', 'write', 'draft', 'post', 'zyng'].includes(word));
+  const extras = Array.from(new Set(words)).slice(0, 2).map((word) => `#${word}`);
+  return Array.from(new Set([...baseByType[type], ...extras])).slice(0, 4).join(' ');
+}
+
+function buildAssistantDraft(prompt: string, type: PostType) {
+  const content = cleanDraftContent(prompt, type);
+  const pollOptions = type === 'poll'
+    ? ['Yes', 'No', 'Maybe'].filter(Boolean)
+    : ['', ''];
+
+  return {
+    content,
+    hashtag: buildHashtags(`${prompt} ${content}`, type),
+    pollOptions,
+  };
 }

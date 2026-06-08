@@ -6,6 +6,7 @@ export const dynamic = 'force-dynamic';
 
 const TTS_MODELS = [
   'gemini-2.5-flash-preview-tts',
+  'gemini-2.5-pro-preview-tts',
   'gemini-3.1-flash-tts-preview',
   'gemini-2.5-flash-native-audio-preview-12-2025',
 ];
@@ -38,6 +39,33 @@ const pcmToWav = (pcm: Buffer, sampleRate = 24000, channels = 1, bitsPerSample =
   return Buffer.concat([header, pcm]);
 };
 
+const getAudioData = (response: any) => {
+  if (typeof response?.data === 'string' && response.data) {
+    return { data: response.data, mimeType: 'audio/pcm;rate=24000' };
+  }
+
+  const parts = response?.candidates?.[0]?.content?.parts || [];
+  for (const part of parts) {
+    const inlineData = part?.inlineData || part?.inline_data;
+    if (typeof inlineData?.data === 'string' && inlineData.data) {
+      return {
+        data: inlineData.data,
+        mimeType: inlineData.mimeType || inlineData.mime_type || 'audio/pcm;rate=24000',
+      };
+    }
+  }
+
+  return null;
+};
+
+const audioDataUrl = (base64Audio: string, mimeType: string) => {
+  if (/audio\/wav/i.test(mimeType)) return `data:audio/wav;base64,${base64Audio}`;
+  if (/audio\/mpeg|audio\/mp3/i.test(mimeType)) return `data:audio/mpeg;base64,${base64Audio}`;
+  const sampleRate = Number(mimeType.match(/rate=(\d+)/i)?.[1] || 24000);
+  const wav = pcmToWav(Buffer.from(base64Audio, 'base64'), sampleRate);
+  return `data:audio/wav;base64,${wav.toString('base64')}`;
+};
+
 export async function POST(request: Request) {
   try {
     const { text, lowLatency } = await request.json();
@@ -67,10 +95,10 @@ export async function POST(request: Request) {
           },
         });
 
-        if (!response.data) throw new Error('No audio returned');
-        const wav = pcmToWav(Buffer.from(response.data, 'base64'));
+        const audio = getAudioData(response);
+        if (!audio) throw new Error('No audio returned');
         return NextResponse.json({
-          audio: `data:audio/wav;base64,${wav.toString('base64')}`,
+          audio: audioDataUrl(audio.data, audio.mimeType),
           model,
         });
       } catch (error) {

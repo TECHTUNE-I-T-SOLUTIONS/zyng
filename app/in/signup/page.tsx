@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
@@ -30,6 +30,7 @@ export default function SignupPage() {
   const [openPicker, setOpenPicker] = useState<'school' | 'faculty' | 'department' | null>(null);
   const [showAlumniModal, setShowAlumniModal] = useState(false);
   const [pendingAlumniAdvance, setPendingAlumniAdvance] = useState<number | null>(null);
+  const searchParams = useSearchParams();
   const [touched, setTouched] = useState({
     phone: false,
     email: false,
@@ -53,19 +54,11 @@ export default function SignupPage() {
     skills: '',
     bio: '',
     graduation_date: '',
-    referral_code: '',
+    referral_code: searchParams?.get?.('ref') || '',
     security_question: '',
     security_answer: '',
     status: 'regular' as 'regular' | 'alumni',
   });
-
-  const searchParams = useSearchParams();
-
-  useEffect(() => {
-    const ref = searchParams?.get?.('ref');
-    if (ref) update({ referral_code: ref });
-  }, [searchParams]);
-
   const update = (patch: Partial<typeof formData>) => setFormData((s) => ({ ...s, ...patch }));
 
   const { data: schools = [] } = useQuery({
@@ -102,19 +95,10 @@ export default function SignupPage() {
   const selectedSchool = useMemo(() => schools.find((school: any) => school.id === formData.school_id), [schools, formData.school_id]);
   const selectedFaculty = useMemo(() => faculties.find((faculty: any) => faculty.id === formData.faculty_id), [faculties, formData.faculty_id]);
   const selectedDepartment = useMemo(() => departments.find((department: any) => department.id === formData.department_id), [departments, formData.department_id]);
-
-  useEffect(() => {
-    setFacultySearch('');
-    setDepartmentSearch('');
-    update({ faculty_id: '', department_id: '' });
-    setOpenPicker(null);
-  }, [formData.school_id]);
-
-  useEffect(() => {
-    setDepartmentSearch('');
-    update({ department_id: '' });
-    setOpenPicker(null);
-  }, [formData.faculty_id]);
+  const graduationMonth = formData.graduation_date ? formData.graduation_date.slice(0, 7) : '';
+  const graduationLabel = formData.graduation_date
+    ? new Date(`${formData.graduation_date}T00:00:00`).toLocaleDateString(undefined, { month: 'long', year: 'numeric' })
+    : 'Not set';
 
   const graduationDatePassed = Boolean(formData.graduation_date && new Date(`${formData.graduation_date}T00:00:00`).getTime() <= new Date(new Date().setHours(0, 0, 0, 0)).getTime());
   const passwordStrength = getPasswordStrength(formData.password);
@@ -278,7 +262,12 @@ export default function SignupPage() {
                     setOpen={(open) => setOpenPicker(open ? 'school' : null)}
                     items={schools}
                     value={selectedSchool?.name || ''}
-                    onSelect={(item: any) => update({ school_id: item.id, faculty_id: '', department_id: '' })}
+                    onSelect={(item: any) => {
+                      update({ school_id: item.id, faculty_id: '', department_id: '' });
+                      setFacultySearch('');
+                      setDepartmentSearch('');
+                      setOpenPicker(null);
+                    }}
                   />
                   <SearchSelect
                     icon={BookOpen}
@@ -291,7 +280,11 @@ export default function SignupPage() {
                     items={faculties}
                     value={selectedFaculty?.name || ''}
                     disabled={!formData.school_id}
-                    onSelect={(item: any) => update({ faculty_id: item.id, department_id: '' })}
+                    onSelect={(item: any) => {
+                      update({ faculty_id: item.id, department_id: '' });
+                      setDepartmentSearch('');
+                      setOpenPicker(null);
+                    }}
                   />
                   <SearchSelect
                     icon={GraduationCap}
@@ -310,10 +303,20 @@ export default function SignupPage() {
                     <input value={formData.course_of_study} onChange={(e) => { update({ course_of_study: e.target.value }); setError(''); }} onBlur={() => setTouched((s) => ({ ...s, course_of_study: true }))} className="auth-input" placeholder="Computer Science" />
                   </Field>
                   {touched.course_of_study && !formData.course_of_study.trim() && <p className="text-[11px] text-red-500">Course of study is required.</p>}
-                  <Field icon={ShieldQuestion} label="Graduation Date">
-                    <input type="date" title="YYYY-MM-DD" value={formData.graduation_date} onChange={(e) => { update({ graduation_date: e.target.value }); setError(''); }} className="auth-input" required />
+                  <Field icon={ShieldQuestion} label="Graduation Month">
+                    <input
+                      type="month"
+                      title="Graduation month and year"
+                      value={graduationMonth}
+                      onChange={(e) => {
+                        update({ graduation_date: e.target.value ? `${e.target.value}-01` : '' });
+                        setError('');
+                      }}
+                      className="auth-input"
+                      required
+                    />
                   </Field>
-                    {!formData.graduation_date.trim() && step === 1 && <p className="text-[11px] text-red-500">Graduation date is required.</p>}
+                    {!formData.graduation_date.trim() && step === 1 && <p className="text-[11px] text-red-500">Graduation month is required.</p>}
                     <Field icon={User} label="Referral Code">
                       <input value={formData.referral_code} onChange={(e) => update({ referral_code: e.target.value })} className="auth-input" placeholder="Optional referral code" />
                     </Field>
@@ -352,7 +355,7 @@ export default function SignupPage() {
                   <div><strong>Faculty:</strong> {selectedFaculty?.name || formData.faculty_id}</div>
                   <div><strong>Department:</strong> {selectedDepartment?.name || formData.department_id}</div>
                   <div><strong>Course:</strong> {formData.course_of_study}</div>
-                  <div><strong>Graduation Date:</strong> {formData.graduation_date || 'Not set'}</div>
+                  <div><strong>Graduation:</strong> {graduationLabel}</div>
                   <div><strong>Recovery Question:</strong> {formData.security_question}</div>
                   <div><strong>Status:</strong> {formData.status}</div>
                 </div>
