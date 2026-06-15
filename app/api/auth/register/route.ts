@@ -36,6 +36,25 @@ export async function POST(request: Request) {
     }
 
     const finalStatus = status === 'alumni' ? 'alumni' : 'regular';
+    const normalizedReferralCode = String(referral_code || '').trim();
+    let referredBy: string | null = referred_by || null;
+    let resolvedReferralCode: string | null = normalizedReferralCode || null;
+
+    if (normalizedReferralCode) {
+      const { data: referrer, error: referrerError } = await supabaseAdmin
+        .from('users')
+        .select('id, referral_code')
+        .eq('referral_code', normalizedReferralCode)
+        .maybeSingle();
+
+      if (referrerError) throw referrerError;
+      if (!referrer) {
+        return NextResponse.json({ error: 'Referral code not found' }, { status: 400 });
+      }
+
+      referredBy = referrer.id;
+      resolvedReferralCode = referrer.referral_code || null;
+    }
 
     const { data: authResult, error: authError } = await supabaseAdmin.auth.signUp({
       email: String(email).trim(),
@@ -45,9 +64,12 @@ export async function POST(request: Request) {
       },
     });
     if (authError) throw authError;
+    if (!authResult.user?.id) {
+      return NextResponse.json({ error: 'Account creation failed. Please try again.' }, { status: 500 });
+    }
 
     const { data, error } = await supabaseAdmin.from('users').insert([{
-      id: authResult.user?.id,
+      id: authResult.user.id,
       phone,
       email,
       full_name,
@@ -60,8 +82,8 @@ export async function POST(request: Request) {
       skills: skills ? skills.split(',').map((s: string) => s.trim()).filter(Boolean) : [],
       bio,
       graduation_date: graduation_date || null,
-      referral_code: referral_code || null,
-      referred_by: referred_by || null,
+      referral_code: null,
+      referred_by: referredBy,
       security_question,
       security_answer_hash: security_answer,
       onboarding_completed: false,
@@ -69,6 +91,21 @@ export async function POST(request: Request) {
     }]).select().single();
 
     if (error) throw error;
+
+    if (referredBy && resolvedReferralCode) {
+      const { error: referralInsertError } = await supabaseAdmin.from('referrals').insert([{
+        referrer_id: referredBy,
+        referred_user_id: data.id,
+        referral_code: resolvedReferralCode,
+        status: finalStatus === 'alumni' ? 'verified' : 'signed_up',
+        source: 'signup_form',
+      }]);
+
+      if (referralInsertError) {
+        console.warn('Referral tracking insert skipped:', referralInsertError.message);
+      }
+    }
+
     return NextResponse.json(data);
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });

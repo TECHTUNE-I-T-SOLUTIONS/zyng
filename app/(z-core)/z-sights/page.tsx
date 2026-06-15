@@ -123,7 +123,7 @@ export default function ZSightsPage() {
   };
 
   return (
-    <div className="flex-1 overflow-y-auto bg-background p-6">
+    <div className="flex-1 overflow-y-auto bg-background p-6 pb-24">
       <div className="max-w-7xl mx-auto">
         <header className="flex flex-col md:flex-row md:items-center justify-between mb-10 gap-6">
           <div>
@@ -267,13 +267,13 @@ export default function ZSightsPage() {
               <input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} placeholder="Project title" className="w-full rounded-2xl border border-border bg-muted p-3 outline-none focus:border-accent" />
               <textarea value={editDescription} onChange={(e) => setEditDescription(e.target.value)} placeholder="Project description" className="h-32 w-full rounded-2xl border border-border bg-muted p-3 outline-none focus:border-accent" />
               <div className="grid gap-4 md:grid-cols-2">
-                <select value={editCategory} onChange={(e) => setEditCategory(e.target.value)} className="rounded-2xl border border-border bg-muted p-3 outline-none focus:border-accent">
+                <select title="Project category" value={editCategory} onChange={(e) => setEditCategory(e.target.value)} className="rounded-2xl border border-border bg-muted p-3 outline-none focus:border-accent">
                   {['Technology', 'Design', 'Business', 'Art', 'Science', 'Community', 'Other'].map((category) => <option key={category} value={category}>{category}</option>)}
                 </select>
                 <input value={editLink} onChange={(e) => setEditLink(e.target.value)} placeholder="Project link" className="rounded-2xl border border-border bg-muted p-3 outline-none focus:border-accent" />
               </div>
               <input value={editTags} onChange={(e) => setEditTags(e.target.value)} placeholder="Tags, comma separated" className="w-full rounded-2xl border border-border bg-muted p-3 outline-none focus:border-accent" />
-              <input ref={fileRef} type="file" accept="image/*" multiple onChange={handleNewImages} className="hidden" />
+              <input title="Upload images" ref={fileRef} type="file" accept="image/*" multiple onChange={handleNewImages} className="hidden" />
               <button onClick={() => fileRef.current?.click()} className="flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-border bg-muted/30 p-5 text-sm font-black uppercase tracking-widest text-foreground/50 hover:border-accent hover:text-accent">
                 <Upload size={18} /> Add Images
               </button>
@@ -282,7 +282,7 @@ export default function ZSightsPage() {
                   {editImages.map((src, index) => (
                     <div key={`${src}-${index}`} className="relative h-24 w-32 overflow-hidden rounded-xl border border-border">
                       <img src={src} alt="Project preview" className="h-full w-full object-cover" />
-                      <button onClick={() => setEditImages((current) => current.filter((_, i) => i !== index))} className="absolute right-2 top-2 rounded-full bg-black/60 p-1 text-white"><X size={14} /></button>
+                      <button title="Remove image" onClick={() => setEditImages((current) => current.filter((_, i) => i !== index))} className="absolute right-2 top-2 rounded-full bg-black/60 p-1 text-white"><X size={14} /></button>
                     </div>
                   ))}
                 </div>

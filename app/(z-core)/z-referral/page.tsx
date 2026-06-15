@@ -43,7 +43,7 @@ export default function ReferralPage() {
   }
 
   return (
-    <div className="flex-1 overflow-y-auto bg-background p-6">
+    <div className="flex-1 overflow-y-auto bg-background p-6 pb-24">
       <div className="max-w-4xl mx-auto">
         <header className="mb-12 text-center">
           <motion.div

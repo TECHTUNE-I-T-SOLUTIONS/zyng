@@ -97,7 +97,7 @@ export default function MarketplaceItemPage({ params }: { params: Promise<{ id?:
   };
 
   return (
-    <div className="flex-1 overflow-y-auto bg-background">
+    <div className="flex-1 overflow-y-auto bg-background pb-24">
       {/* Top Bar */}
       <div className="sticky top-0 z-20 bg-background/80 backdrop-blur-xl border-b border-border px-6 py-4 flex items-center justify-between">
         <button onClick={() => router.back()} className="p-2 bg-muted rounded-xl hover:bg-muted/80 transition flex items-center gap-2 text-sm font-bold">

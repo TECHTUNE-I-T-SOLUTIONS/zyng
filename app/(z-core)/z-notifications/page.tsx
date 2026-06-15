@@ -57,7 +57,7 @@ export default function NotificationsPage() {
   });
 
   return (
-    <div className="flex-1 overflow-y-auto bg-background p-6">
+    <div className="flex-1 overflow-y-auto bg-background p-6 pb-24">
       <div className="max-w-2xl mx-auto">
         <header className="mb-10">
           <h1 className="text-4xl font-black tracking-tighter mb-2 flex items-center gap-3">

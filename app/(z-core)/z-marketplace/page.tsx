@@ -185,7 +185,7 @@ export default function MarketplacePage() {
   };
 
   return (
-    <div className="flex-1 overflow-y-auto bg-background p-6">
+    <div className="flex-1 overflow-y-auto bg-background p-6 pb-24">
       <div className="max-w-7xl mx-auto">
         <header className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-6">
           <div>
